@@ -7,8 +7,11 @@ export default auth(function middleware(req) {
   const isLoggedIn = !!req.auth;
   const isAuthPage = nextUrl.pathname.startsWith("/login");
   const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
+  const isPublicApiRoute =
+    nextUrl.pathname === "/api/seed" ||
+    nextUrl.pathname === "/api/health";
 
-  if (isApiAuthRoute) {
+  if (isApiAuthRoute || isPublicApiRoute) {
     return NextResponse.next();
   }
 
