@@ -14,6 +14,9 @@ const DEFAULTS = {
   address: null,
   phone: null,
   email: null,
+  kotEnabled: false,
+  printerIp: null,
+  printerEnabled: false,
 };
 
 export async function GET() {
@@ -37,7 +40,7 @@ export async function PATCH(request: NextRequest) {
     if (role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await request.json();
-    const allowed = ["systemName", "logo", "currency", "currencySymbol", "timezone", "taxRate", "theme", "address", "phone", "email"];
+    const allowed = ["systemName", "logo", "currency", "currencySymbol", "timezone", "taxRate", "theme", "address", "phone", "email", "kotEnabled", "printerIp", "printerEnabled"];
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) data[key] = body[key];

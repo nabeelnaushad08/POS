@@ -15,6 +15,9 @@ const defaults: SystemSettings = {
   address: null,
   phone: null,
   email: null,
+  kotEnabled: false,
+  printerIp: null,
+  printerEnabled: false,
 };
 
 const SettingsContext = createContext<SystemSettings>(defaults);

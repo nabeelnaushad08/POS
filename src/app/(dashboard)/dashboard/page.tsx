@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -17,6 +19,14 @@ export default function DashboardPage() {
   const fmt = useCurrency();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  // Cashiers should only use POS — redirect them away from the dashboard
+  useEffect(() => {
+    const role = (session?.user as { role?: string })?.role;
+    if (role === "CASHIER") router.replace("/pos");
+  }, [session, router]);
 
   const statCards = (stats: DashboardStats) => [
     {

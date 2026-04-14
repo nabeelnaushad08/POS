@@ -214,13 +214,46 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
 
           {/* Payment amounts */}
           {paymentMethod === "CASH" && (
-            <div>
+            <div className="space-y-2">
               <Label className="text-xs">Cash Received</Label>
               <Input type="number" min={0} step={0.01} placeholder={total.toFixed(2)}
                 value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} className="mt-1" />
+              {/* Quick denomination buttons */}
+              <div className="grid grid-cols-4 gap-1.5">
+                {[100, 500, 1000, 5000].map((denom) => (
+                  <button
+                    key={denom}
+                    type="button"
+                    onClick={() => setCashAmount((prev) => {
+                      const current = parseFloat(prev) || 0;
+                      return (current + denom).toFixed(2);
+                    })}
+                    className="py-1.5 rounded-lg border-2 border-slate-200 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-semibold transition-all active:scale-95"
+                  >
+                    +{denom.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                {cashAmount && (
+                  <button type="button" onClick={() => setCashAmount("")}
+                    className="text-xs text-slate-400 hover:text-red-500 transition-colors">
+                    Clear
+                  </button>
+                )}
+                <button type="button" onClick={() => setCashAmount(total.toFixed(2))}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors ml-auto">
+                  Exact amount
+                </button>
+              </div>
               {cashNum >= total && cashNum > 0 && (
-                <p className="text-sm text-green-600 mt-1 font-medium">
+                <p className="text-sm text-green-600 font-semibold bg-green-50 px-3 py-1.5 rounded-lg">
                   Change: {fmt(change)}
+                </p>
+              )}
+              {cashNum > 0 && cashNum < total && (
+                <p className="text-sm text-red-500 font-medium">
+                  Short by: {fmt(total - cashNum)}
                 </p>
               )}
             </div>

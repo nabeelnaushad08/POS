@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X } from "lucide-react";
+import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi } from "lucide-react";
 
 interface SystemSettingsData {
   systemName: string;
@@ -13,6 +13,9 @@ interface SystemSettingsData {
   address: string | null;
   phone: string | null;
   email: string | null;
+  kotEnabled: boolean;
+  printerIp: string;
+  printerEnabled: boolean;
 }
 
 export default function SettingsPage() {
@@ -27,6 +30,9 @@ export default function SettingsPage() {
     address: "",
     phone: "",
     email: "",
+    kotEnabled: false,
+    printerIp: "",
+    printerEnabled: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,6 +56,9 @@ export default function SettingsPage() {
             address: d.data.address || "",
             phone: d.data.phone || "",
             email: d.data.email || "",
+            kotEnabled: d.data.kotEnabled ?? false,
+            printerIp: d.data.printerIp || "",
+            printerEnabled: d.data.printerEnabled ?? false,
           });
         }
       })
@@ -374,6 +383,97 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* KOT Settings */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+            <UtensilsCrossed className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Kitchen Order Ticket (KOT)</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">For restaurants & fast food — prints a second ticket to the kitchen on every sale</p>
+          </div>
+        </div>
+        <label className="flex items-center gap-4 cursor-pointer group">
+          <div className="relative">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={settings.kotEnabled}
+              onChange={(e) => setSettings((prev) => ({ ...prev, kotEnabled: e.target.checked }))}
+            />
+            <div className={`w-12 h-6 rounded-full transition-colors ${settings.kotEnabled ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}`} />
+            <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.kotEnabled ? "translate-x-6" : ""}`} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {settings.kotEnabled ? "KOT Enabled — kitchen copy will print on every sale" : "KOT Disabled — only customer receipt prints"}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Enable for restaurants, bakeries, or any kitchen-based operation</p>
+          </div>
+        </label>
+      </div>
+
+      {/* Printer Network */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
+            <Wifi className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Network Printer (Wi-Fi / LAN)</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Epson or other thermal printers connected over the local network</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <label className="flex items-center gap-4 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={settings.printerEnabled}
+                onChange={(e) => setSettings((prev) => ({ ...prev, printerEnabled: e.target.checked }))}
+              />
+              <div className={`w-12 h-6 rounded-full transition-colors ${settings.printerEnabled ? "bg-cyan-500" : "bg-gray-300 dark:bg-gray-600"}`} />
+              <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.printerEnabled ? "translate-x-6" : ""}`} />
+            </div>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              {settings.printerEnabled ? "Network printer enabled" : "Network printer disabled (using system default printer)"}
+            </span>
+          </label>
+
+          {settings.printerEnabled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Printer IP Address</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={settings.printerIp}
+                    onChange={(e) => setSettings((prev) => ({ ...prev, printerIp: e.target.value }))}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent font-mono"
+                    placeholder="192.168.1.100"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Must be on the same network as the router. Check your router admin panel for the printer&apos;s assigned IP.
+                </p>
+              </div>
+              <div className="flex flex-col justify-end">
+                <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg p-3 text-xs text-cyan-700 dark:text-cyan-300 space-y-1">
+                  <p className="font-medium">Setup guide:</p>
+                  <p>1. Connect printer to the same router</p>
+                  <p>2. Print a network config page from the printer</p>
+                  <p>3. Enter the IP shown on that page above</p>
+                  <p>4. Save settings — status will show in header</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Printer Settings Link */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 rounded-xl border border-blue-200 dark:border-blue-800 p-5">
         <div className="flex items-center justify-between">
@@ -381,7 +481,7 @@ export default function SettingsPage() {
             <Settings className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <div>
               <h3 className="font-medium text-gray-900 dark:text-white">Printer Settings</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Configure receipt and purchase order printer settings</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Configure receipt layout, paper size, logo, and footer text</p>
             </div>
           </div>
           <a

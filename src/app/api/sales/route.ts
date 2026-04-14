@@ -110,6 +110,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get today's bill number (count of today's sales + 1)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayCount = await prisma.sale.count({
+      where: { createdAt: { gte: todayStart } },
+    });
+    const billNumber = todayCount + 1;
+
     // Create sale in a transaction
     const sale = await prisma.$transaction(async (tx) => {
       const receiptNumber = generateReceiptNumber();
@@ -191,7 +199,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ data: sale }, { status: 201 });
+    return NextResponse.json({ data: { ...sale, billNumber } }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation error", details: error.issues }, { status: 400 });

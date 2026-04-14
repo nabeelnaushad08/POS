@@ -130,29 +130,6 @@ export interface SaleItem {
   subtotal: number | string;
 }
 
-export interface Sale {
-  id: string;
-  receiptNumber: string;
-  userId: string;
-  customerId?: string | null;
-  user?: { name: string; email: string };
-  customer?: Customer | null;
-  subtotal: number | string;
-  discount: number | string;
-  tax: number | string;
-  total: number | string;
-  paymentMethod: PaymentMethod;
-  cashAmount?: number | string | null;
-  cardAmount?: number | string | null;
-  change?: number | string | null;
-  status: SaleStatus;
-  notes?: string | null;
-  customerName?: string | null;
-  customerPhone?: string | null;
-  items?: SaleItem[];
-  createdAt: string | Date;
-}
-
 export interface LowStockProduct {
   id: string;
   name: string;
@@ -207,6 +184,33 @@ export interface SystemSettings {
   address?: string | null;
   phone?: string | null;
   email?: string | null;
+  kotEnabled?: boolean;
+  printerIp?: string | null;
+  printerEnabled?: boolean;
+}
+
+export interface Sale {
+  id: string;
+  receiptNumber: string;
+  billNumber?: number | null;
+  userId: string;
+  customerId?: string | null;
+  user?: { name: string; email: string };
+  customer?: Customer | null;
+  subtotal: number | string;
+  discount: number | string;
+  tax: number | string;
+  total: number | string;
+  paymentMethod: PaymentMethod;
+  cashAmount?: number | string | null;
+  cardAmount?: number | string | null;
+  change?: number | string | null;
+  status: SaleStatus;
+  notes?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  items?: SaleItem[];
+  createdAt: string | Date;
 }
 
 export interface ApiResponse<T = unknown> {

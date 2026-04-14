@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/pos/product-card";
 import { Cart } from "@/components/pos/cart";
 import { CheckoutModal } from "@/components/pos/checkout-modal";
-import { Receipt } from "@/components/pos/receipt";
 import { useCart } from "@/hooks/use-cart";
-import type { Product, Sale } from "@/types";
+import { useSettings } from "@/lib/settings-context";
+import { printReceipt, printKOT } from "@/lib/print-utils";
+import type { Product } from "@/types";
 import toast from "react-hot-toast";
 
 export default function POSPage() {
@@ -19,8 +20,8 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const cart = useCart();
+  const settings = useSettings();
 
   const loadProducts = useCallback(async () => {
     try {
@@ -110,8 +111,27 @@ export default function POSPage() {
       const { data } = await res.json();
       cart.clearCart();
       setShowCheckout(false);
-      setCompletedSale(data);
-      toast.success("Sale completed!");
+
+      // Auto-print receipt
+      const printerSettings = {
+        systemName: settings.systemName,
+        currencySymbol: settings.currencySymbol,
+        paperSize: "80mm" as const,
+        footer: "Thank you for your purchase!",
+        showFooter: true,
+      };
+      printReceipt(data, printerSettings);
+
+      // Print KOT if enabled
+      if (settings.kotEnabled) {
+        setTimeout(() => printKOT(data, printerSettings), 800);
+      }
+
+      // Sale complete toast
+      toast.success(
+        `Bill No. ${data.billNumber ?? "—"} · ${settings.currencySymbol} ${Number(data.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        { duration: 5000, icon: "🧾" }
+      );
       loadProducts(); // refresh stock
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to process sale";
@@ -121,7 +141,7 @@ export default function POSPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] gap-0">
+    <div className="flex h-full gap-0">
       {/* Products Panel */}
       <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
         {/* Search & Filters */}
@@ -242,22 +262,6 @@ export default function POSPage() {
         onConfirm={handleCheckout}
       />
 
-      {/* Receipt Modal */}
-      <AnimatePresence>
-        {completedSale && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          >
-            <Receipt
-              sale={completedSale}
-              onClose={() => setCompletedSale(null)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

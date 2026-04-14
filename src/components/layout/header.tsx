@@ -1,8 +1,8 @@
 "use client";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
-import { Bell, LogOut, User, Settings, ChevronDown } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Bell, LogOut, User, Settings, ChevronDown, Printer, Wifi, WifiOff } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MobileSidebar } from "@/components/layout/sidebar";
+import { useSettings } from "@/lib/settings-context";
 import Link from "next/link";
 
 interface HeaderProps {
@@ -20,11 +21,16 @@ interface HeaderProps {
   lowStockCount?: number;
 }
 
+type PrinterStatus = "unknown" | "online" | "offline";
+
 export function Header({ title, lowStockCount = 0 }: HeaderProps) {
   const { data: session } = useSession();
   const user = session?.user;
   const role = (user as { role?: string })?.role || "CASHIER";
   const [liveStockCount, setLiveStockCount] = useState(lowStockCount);
+  const { printerEnabled, printerIp } = useSettings();
+  const [printerStatus, setPrinterStatus] = useState<PrinterStatus>("unknown");
+  const pingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -37,6 +43,33 @@ export function Header({ title, lowStockCount = 0 }: HeaderProps) {
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
   }, []);
+
+  // Printer status ping
+  useEffect(() => {
+    if (pingRef.current) clearInterval(pingRef.current);
+    if (!printerEnabled || !printerIp) {
+      setPrinterStatus("unknown");
+      return;
+    }
+    const checkPrinter = () => {
+      // Use image ping technique — works for many embedded printers that serve a favicon
+      const img = new Image();
+      const timer = setTimeout(() => {
+        img.src = "";
+        setPrinterStatus("offline");
+      }, 3000);
+      img.onload = () => { clearTimeout(timer); setPrinterStatus("online"); };
+      img.onerror = () => {
+        clearTimeout(timer);
+        // onerror can still mean the server responded (just no image), treat as online
+        setPrinterStatus("online");
+      };
+      img.src = `http://${printerIp}/favicon.ico?_=${Date.now()}`;
+    };
+    checkPrinter();
+    pingRef.current = setInterval(checkPrinter, 30000);
+    return () => { if (pingRef.current) clearInterval(pingRef.current); };
+  }, [printerEnabled, printerIp]);
 
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -58,6 +91,26 @@ export function Header({ title, lowStockCount = 0 }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Printer status */}
+        {printerEnabled && printerIp && (
+          <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+            printerStatus === "online"
+              ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
+              : printerStatus === "offline"
+              ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+              : "bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
+          }`}>
+            <Printer className="w-3 h-3" />
+            {printerStatus === "online" ? (
+              <><Wifi className="w-3 h-3" /> Online</>
+            ) : printerStatus === "offline" ? (
+              <><WifiOff className="w-3 h-3" /> Offline</>
+            ) : (
+              "Checking..."
+            )}
+          </div>
+        )}
+
         {/* Live low stock alert bell */}
         <Link href="/notifications" className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors">
           <Bell className="h-5 w-5" />

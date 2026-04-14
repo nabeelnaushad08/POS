@@ -1,7 +1,9 @@
 import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { Sidebar, MobileSidebar } from "@/components/layout/sidebar";
+import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { CashierPOSLayout } from "@/components/layout/cashier-pos-layout";
 import { SettingsProvider } from "@/lib/settings-context";
 import { prisma } from "@/lib/prisma";
 
@@ -14,6 +16,11 @@ export default async function DashboardLayout({
   if (!session) redirect("/login");
 
   const role = session.user.role || "CASHIER";
+
+  // Get current path from headers
+  const headersList = await headers();
+  const pathname = headersList.get("x-invoke-path") || headersList.get("x-pathname") || "";
+  const isCashierPOS = role === "CASHIER" && (pathname === "/pos" || pathname.startsWith("/pos"));
 
   // Get low stock count using raw query
   const lowStockResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -29,6 +36,19 @@ export default async function DashboardLayout({
 
   const systemName = settings?.systemName ?? "POS System";
   const systemLogo = settings?.logo ?? null;
+
+  // Cashier always gets the full-screen POS layout (no sidebar)
+  if (role === "CASHIER") {
+    return (
+      <SettingsProvider value={settings ?? null}>
+        <CashierPOSLayout systemName={systemName} systemLogo={systemLogo}>
+          {children}
+        </CashierPOSLayout>
+      </SettingsProvider>
+    );
+  }
+
+  void isCashierPOS; // suppress unused warning
 
   return (
     <SettingsProvider value={settings ?? null}>

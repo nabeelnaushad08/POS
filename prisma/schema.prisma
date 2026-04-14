@@ -321,6 +321,9 @@ model SystemSettings {
   address        String?
   phone          String?
   email          String?
+  kotEnabled     Boolean  @default(false)
+  printerIp      String?
+  printerEnabled Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
