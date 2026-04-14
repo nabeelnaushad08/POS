@@ -29,6 +29,7 @@ export default function InventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const LIMIT = 20;
 
   const loadProducts = useCallback(async () => {
@@ -59,6 +60,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     fetch("/api/categories").then(r => r.json()).then(d => setCategories(d.data || []));
+    fetch("/api/suppliers?limit=100").then(r => r.json()).then(d => setSuppliers((d.data || []).map((s: { id: string; name: string }) => ({ id: s.id, name: s.name }))));
   }, []);
 
   useEffect(() => {
@@ -292,6 +294,7 @@ export default function InventoryPage() {
         onClose={() => { setShowAddModal(false); setEditProduct(null); }}
         product={editProduct}
         categories={categories}
+        suppliers={suppliers}
         onSuccess={() => { loadProducts(); setShowAddModal(false); setEditProduct(null); }}
       />
       <BulkImportModal

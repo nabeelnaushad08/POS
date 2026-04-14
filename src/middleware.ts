@@ -11,7 +11,12 @@ export default auth(function middleware(req) {
     nextUrl.pathname === "/api/seed" ||
     nextUrl.pathname === "/api/health";
 
-  if (isApiAuthRoute || isPublicApiRoute) {
+  // Public API routes (no auth needed)
+  const isPublicSettingsApi =
+    nextUrl.pathname === "/api/settings" && req.method === "GET" ||
+    nextUrl.pathname.startsWith("/api/printer-settings") && req.method === "GET";
+
+  if (isApiAuthRoute || isPublicApiRoute || isPublicSettingsApi) {
     return NextResponse.next();
   }
 
@@ -27,12 +32,23 @@ export default auth(function middleware(req) {
 
   // Role-based access control
   const role = (req.auth?.user as { role?: string })?.role;
-  const isCashierOnly = nextUrl.pathname.startsWith("/reports") ||
-    nextUrl.pathname.startsWith("/users") ||
-    nextUrl.pathname.startsWith("/inventory");
-  const isAdminOnly = nextUrl.pathname.startsWith("/users");
 
-  if (role === "CASHIER" && isCashierOnly) {
+  // Routes accessible only by ADMIN
+  const isAdminOnly =
+    nextUrl.pathname.startsWith("/users") ||
+    nextUrl.pathname.startsWith("/settings");
+
+  // Routes restricted from CASHIER
+  const isCashierRestricted =
+    nextUrl.pathname.startsWith("/reports") ||
+    nextUrl.pathname.startsWith("/users") ||
+    nextUrl.pathname.startsWith("/inventory") ||
+    nextUrl.pathname.startsWith("/sales") ||
+    nextUrl.pathname.startsWith("/suppliers") ||
+    nextUrl.pathname.startsWith("/purchases") ||
+    nextUrl.pathname.startsWith("/settings");
+
+  if (role === "CASHIER" && isCashierRestricted) {
     return NextResponse.redirect(new URL("/pos", nextUrl));
   }
 

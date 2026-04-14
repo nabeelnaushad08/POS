@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
+import { Sidebar, MobileSidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { SettingsProvider } from "@/lib/settings-context";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardLayout({
@@ -20,15 +21,26 @@ export default async function DashboardLayout({
   `.catch(() => [{ count: BigInt(0) }]);
   const lowStockCount = Number(lowStockResult[0]?.count ?? 0);
 
+  // Get system settings
+  const rawSettings = await prisma.systemSettings.findFirst().catch(() => null);
+  const settings = rawSettings
+    ? { ...rawSettings, taxRate: Number(rawSettings.taxRate) }
+    : null;
+
+  const systemName = settings?.systemName ?? "POS System";
+  const systemLogo = settings?.logo ?? null;
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar role={role} />
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Header lowStockCount={lowStockCount} />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+    <SettingsProvider value={settings ?? null}>
+      <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden">
+        <Sidebar role={role} systemName={systemName} systemLogo={systemLogo} />
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <Header lowStockCount={lowStockCount} />
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SettingsProvider>
   );
 }

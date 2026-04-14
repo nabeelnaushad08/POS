@@ -29,7 +29,10 @@ export async function GET(
     const { id } = await params;
     const product = await prisma.product.findUnique({
       where: { id },
-      include: { category: true },
+      include: {
+        category: true,
+        supplierProducts: { include: { supplier: { select: { id: true, name: true } } } },
+      },
     });
 
     if (!product) return NextResponse.json({ error: "Product not found" }, { status: 404 });

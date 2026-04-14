@@ -66,3 +66,17 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
     timeout = setTimeout(() => fn(...args), delay);
   };
 }
+
+export function formatAmount(amount: number | string | null | undefined, symbol = "Rs."): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : (amount ?? 0);
+  return `${symbol} ${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function generatePurchaseNumber(): string {
+  const now = new Date();
+  const y = now.getFullYear().toString().slice(-2);
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const rand = Math.floor(Math.random() * 9999).toString().padStart(4, "0");
+  return `PO-${y}${m}${d}-${rand}`;
+}

@@ -14,6 +14,11 @@ import {
   ChevronLeft,
   Menu,
   Store,
+  UserRound,
+  Receipt,
+  Truck,
+  ShoppingBag,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,13 +37,20 @@ const navItems: NavItem[] = [
   { label: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "MANAGER"] },
   { label: "Users", href: "/users", icon: Users, roles: ["ADMIN"] },
   { label: "Notifications", href: "/notifications", icon: Bell, roles: ["ADMIN", "MANAGER"] },
+  { label: "Customers", href: "/customers", icon: UserRound, roles: ["ADMIN", "MANAGER", "CASHIER"] },
+  { label: "Sales", href: "/sales", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
+  { label: "Suppliers", href: "/suppliers", icon: Truck, roles: ["ADMIN", "MANAGER"] },
+  { label: "Purchases", href: "/purchases", icon: ShoppingBag, roles: ["ADMIN", "MANAGER"] },
+  { label: "Settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
 ];
 
 interface SidebarProps {
   role?: string;
+  systemName?: string;
+  systemLogo?: string | null;
 }
 
-export function Sidebar({ role = "CASHIER" }: SidebarProps) {
+export function Sidebar({ role = "CASHIER", systemName = "POS System", systemLogo = null }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
@@ -52,8 +64,12 @@ export function Sidebar({ role = "CASHIER" }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-700">
-        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
-          <Store className="h-5 w-5 text-white" />
+        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+          {systemLogo ? (
+            <img src={systemLogo} alt={systemName} className="max-h-8 object-contain w-full h-full" />
+          ) : (
+            <Store className="h-5 w-5 text-white" />
+          )}
         </div>
         <AnimatePresence>
           {!collapsed && (
@@ -63,7 +79,7 @@ export function Sidebar({ role = "CASHIER" }: SidebarProps) {
               exit={{ opacity: 0, x: -10 }}
               className="overflow-hidden"
             >
-              <p className="font-bold text-base whitespace-nowrap">POS System</p>
+              <p className="font-bold text-base whitespace-nowrap">{systemName}</p>
               <p className="text-xs text-slate-400 whitespace-nowrap">Inventory & Sales</p>
             </motion.div>
           )}
@@ -133,7 +149,7 @@ export function Sidebar({ role = "CASHIER" }: SidebarProps) {
 }
 
 // Mobile sidebar
-export function MobileSidebar({ role = "CASHIER" }: SidebarProps) {
+export function MobileSidebar({ role = "CASHIER", systemName = "POS System", systemLogo = null }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const filteredItems = navItems.filter((item) => item.roles.includes(role));
@@ -165,11 +181,15 @@ export function MobileSidebar({ role = "CASHIER" }: SidebarProps) {
               className="fixed left-0 top-0 bottom-0 w-64 bg-slate-900 text-white z-50 md:hidden flex flex-col"
             >
               <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-700">
-                <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
-                  <Store className="h-5 w-5 text-white" />
+                <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                  {systemLogo ? (
+                    <img src={systemLogo} alt={systemName} className="max-h-8 object-contain w-full h-full" />
+                  ) : (
+                    <Store className="h-5 w-5 text-white" />
+                  )}
                 </div>
                 <div>
-                  <p className="font-bold">POS System</p>
+                  <p className="font-bold">{systemName}</p>
                   <p className="text-xs text-slate-400">Inventory & Sales</p>
                 </div>
               </div>

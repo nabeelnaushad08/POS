@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/utils";
-import { CreditCard, Banknote, Blend } from "lucide-react";
+import { CreditCard, Banknote, Blend, Search, X } from "lucide-react";
 import type { CartItem } from "@/types";
 
 type PaymentMethod = "CASH" | "CARD" | "MIXED";
@@ -22,7 +22,15 @@ interface CheckoutData {
   total: number;
   customerName?: string;
   customerPhone?: string;
+  customerId?: string;
   notes?: string;
+}
+
+interface CustomerResult {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
 }
 
 interface CheckoutModalProps {
@@ -42,7 +50,16 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
   const [cardAmount, setCardAmount] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerId, setCustomerId] = useState<string | undefined>(undefined);
   const [notes, setNotes] = useState("");
+
+  // Customer search state
+  const [searchPhone, setSearchPhone] = useState("");
+  const [searchResults, setSearchResults] = useState<CustomerResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerResult | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const discountNum = parseFloat(discount) || 0;
   const taxNum = parseFloat(tax) || 0;
@@ -50,6 +67,48 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
   const cardNum = parseFloat(cardAmount) || 0;
   const total = Math.max(0, subtotal - discountNum + taxNum);
   const change = paymentMethod === "CASH" ? Math.max(0, cashNum - total) : 0;
+
+  const handleCustomerSearch = async () => {
+    if (searchPhone.length < 5) return;
+    setSearchLoading(true);
+    setShowResults(true);
+    try {
+      const res = await fetch(`/api/customers?search=${encodeURIComponent(searchPhone)}&limit=5`);
+      const data = await res.json();
+      setSearchResults(data.data || []);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCustomerSearch();
+    }
+  };
+
+  const handleSelectCustomer = (customer: CustomerResult) => {
+    setSelectedCustomer(customer);
+    setCustomerId(customer.id);
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    setShowResults(false);
+    setSearchPhone("");
+    setSearchResults([]);
+  };
+
+  const handleClearCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomerId(undefined);
+    setCustomerName("");
+    setCustomerPhone("");
+    setSearchPhone("");
+    setSearchResults([]);
+    setShowResults(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +124,7 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
         total,
         customerName: customerName || undefined,
         customerPhone: customerPhone || undefined,
+        customerId: customerId || undefined,
         notes: notes || undefined,
       });
     } finally {
@@ -187,6 +247,80 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
               </div>
             </div>
           )}
+
+          {/* Customer Lookup */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Search Customer</Label>
+              {selectedCustomer && (
+                <button
+                  type="button"
+                  onClick={handleClearCustomer}
+                  className="text-xs text-slate-500 hover:text-red-500 flex items-center gap-1 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {selectedCustomer ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                  {selectedCustomer.name}
+                  {selectedCustomer.phone && (
+                    <span className="ml-1 text-green-600">· {selectedCustomer.phone}</span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <div ref={searchRef} className="relative">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter phone number..."
+                    className="h-9 flex-1"
+                    value={searchPhone}
+                    onChange={(e) => setSearchPhone(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-3"
+                    onClick={handleCustomerSearch}
+                    disabled={searchPhone.length < 5 || searchLoading}
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+                {showResults && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                    {searchLoading ? (
+                      <div className="px-4 py-3 text-sm text-slate-500">Searching...</div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-slate-500">No customers found</div>
+                    ) : (
+                      <ul>
+                        {searchResults.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectCustomer(c)}
+                              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors"
+                            >
+                              <p className="text-sm font-medium text-slate-800">{c.name}</p>
+                              <p className="text-xs text-slate-500">{c.phone}{c.email ? ` · ${c.email}` : ""}</p>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Customer Info */}
           <div className="grid grid-cols-2 gap-3">

@@ -8,8 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Truck } from "lucide-react";
 import type { Product, Category } from "@/types";
 import toast from "react-hot-toast";
+
+interface SupplierOption {
+  id: string;
+  name: string;
+}
 
 interface ProductFormData {
   name: string;
@@ -31,6 +37,7 @@ interface ProductFormModalProps {
   onClose: () => void;
   product?: Product | null;
   categories: Category[];
+  suppliers?: SupplierOption[];
   onSuccess: () => void;
 }
 
@@ -40,11 +47,13 @@ const defaultForm: ProductFormData = {
   stock: "0", minimumStock: "5", unit: "pcs", image: "", isActive: true,
 };
 
-export function ProductFormModal({ open, onClose, product, categories, onSuccess }: ProductFormModalProps) {
+export function ProductFormModal({ open, onClose, product, categories, suppliers = [], onSuccess }: ProductFormModalProps) {
   const isEdit = !!product;
   const [form, setForm] = useState<ProductFormData>(defaultForm);
   const [errors, setErrors] = useState<Partial<Record<keyof ProductFormData, string>>>({});
   const [saving, setSaving] = useState(false);
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
+  const [originalSupplierIds, setOriginalSupplierIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (product) {
@@ -62,14 +71,40 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
         image: product.image || "",
         isActive: product.isActive,
       });
+      // Load supplier links from product data
+      if (product.supplierProducts && product.supplierProducts.length > 0) {
+        const ids = product.supplierProducts.map((sp) => sp.supplierId);
+        setSelectedSupplierIds(ids);
+        setOriginalSupplierIds(ids);
+      } else {
+        // Fetch from API if not included
+        fetch(`/api/products/${product.id}`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.data?.supplierProducts) {
+              const ids = d.data.supplierProducts.map((sp: { supplierId: string }) => sp.supplierId);
+              setSelectedSupplierIds(ids);
+              setOriginalSupplierIds(ids);
+            }
+          })
+          .catch(() => {});
+      }
     } else {
       setForm(defaultForm);
+      setSelectedSupplierIds([]);
+      setOriginalSupplierIds([]);
     }
     setErrors({});
   }, [product, open]);
 
   const set = (field: keyof ProductFormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
+
+  const toggleSupplier = (supplierId: string) => {
+    setSelectedSupplierIds((prev) =>
+      prev.includes(supplierId) ? prev.filter((id) => id !== supplierId) : [...prev, supplierId]
+    );
+  };
 
   const validate = (): boolean => {
     const errs: Partial<Record<keyof ProductFormData, string>> = {};
@@ -81,6 +116,26 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
     if (isNaN(Number(form.minimumStock)) || Number(form.minimumStock) < 0) errs.minimumStock = "Invalid min stock";
     setErrors(errs);
     return Object.keys(errs).length === 0;
+  };
+
+  const syncSupplierLinks = async (productId: string) => {
+    const toAdd = selectedSupplierIds.filter((id) => !originalSupplierIds.includes(id));
+    const toRemove = originalSupplierIds.filter((id) => !selectedSupplierIds.includes(id));
+
+    await Promise.allSettled([
+      ...toAdd.map((supplierId) =>
+        fetch(`/api/suppliers/${supplierId}/products`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId }),
+        })
+      ),
+      ...toRemove.map((supplierId) =>
+        fetch(`/api/suppliers/${supplierId}/products?productId=${productId}`, {
+          method: "DELETE",
+        })
+      ),
+    ]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,6 +166,14 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
         body: JSON.stringify(body),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed to save"); }
+      const saved = await res.json();
+      const savedProductId = saved.data?.id || product?.id;
+
+      // Sync supplier links
+      if (savedProductId && suppliers.length > 0) {
+        await syncSupplierLinks(savedProductId);
+      }
+
       toast.success(isEdit ? "Product updated!" : "Product created!");
       onSuccess();
     } catch (err: unknown) {
@@ -183,6 +246,43 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
               <Label>Description</Label>
               <Input value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Product description..." className="mt-1" />
             </div>
+
+            {/* Supplier Links */}
+            {suppliers.length > 0 && (
+              <div className="sm:col-span-2">
+                <Label className="flex items-center gap-1.5 mb-2">
+                  <Truck className="w-3.5 h-3.5" />
+                  Linked Suppliers
+                  <span className="text-gray-400 font-normal text-xs">(optional)</span>
+                </Label>
+                <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-lg bg-gray-50 min-h-[48px]">
+                  {suppliers.map((supplier) => {
+                    const isSelected = selectedSupplierIds.includes(supplier.id);
+                    return (
+                      <button
+                        key={supplier.id}
+                        type="button"
+                        onClick={() => toggleSupplier(supplier.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                          isSelected
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "bg-white border-gray-300 text-gray-600 hover:border-blue-400"
+                        }`}
+                      >
+                        {supplier.name}
+                        {isSelected && <span className="ml-1">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedSupplierIds.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    {selectedSupplierIds.length} supplier{selectedSupplierIds.length > 1 ? "s" : ""} linked
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <Switch checked={form.isActive} onCheckedChange={(v) => set("isActive", v)} />
               <Label>Active Product</Label>

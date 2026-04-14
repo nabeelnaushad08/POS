@@ -21,6 +21,7 @@ const saleSchema = z.object({
   cashAmount: z.number().optional().nullable(),
   cardAmount: z.number().optional().nullable(),
   change: z.number().optional().nullable(),
+  customerId: z.string().optional().nullable(),
   customerName: z.string().optional().nullable(),
   customerPhone: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           user: { select: { name: true, email: true } },
+          customer: { select: { id: true, name: true, phone: true } },
           items: true,
         },
         orderBy: { createdAt: "desc" },
@@ -117,6 +119,7 @@ export async function POST(request: NextRequest) {
         data: {
           receiptNumber,
           userId,
+          customerId: validated.customerId ?? null,
           subtotal: validated.subtotal,
           discount: validated.discount,
           tax: validated.tax,
