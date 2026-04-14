@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { Supplier, Product, SupplierPayment } from "@/types";
 import toast from "react-hot-toast";
 
@@ -21,6 +22,7 @@ interface SupplierForm { name: string; contactPerson: string; phone: string; ema
 const defaultForm: SupplierForm = { name: "", contactPerson: "", phone: "", email: "", address: "", notes: "", isActive: true };
 
 export default function SuppliersPage() {
+  const fmt = useCurrency();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -38,6 +40,8 @@ export default function SuppliersPage() {
   const [detailTab, setDetailTab] = useState<"info" | "products" | "payments">("info");
   const [supplierProducts, setSupplierProducts] = useState<{ id: string; product: Product }[]>([]);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
+  const [supplierFinancials, setSupplierFinancials] = useState<{ totalPurchased: number; totalPaid: number; balance: number } | null>(null);
+  const [supplierPurchases, setSupplierPurchases] = useState<Array<{ id: string; purchaseNumber: string; total: number; status: string; createdAt: string; items: Array<{ productName: string; quantity: number }> }>>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [productSearch, setProductSearch] = useState("");
@@ -112,13 +116,17 @@ export default function SuppliersPage() {
   const openDetail = async (s: Supplier) => {
     setDetailSupplier(s); setDetailTab("info"); setLoadingDetail(true);
     try {
-      const [pRes, payRes, aRes] = await Promise.all([
-        fetch(`/api/suppliers/${s.id}/products`),
-        fetch(`/api/suppliers/${s.id}/payments`),
+      const [detailRes, aRes] = await Promise.all([
+        fetch(`/api/suppliers/${s.id}`),
         fetch("/api/products?limit=500&isActive=true"),
       ]);
-      const pData = await pRes.json(); setSupplierProducts(pData.data || []);
-      const payData = await payRes.json(); setSupplierPayments(payData.data || []);
+      const detailData = await detailRes.json();
+      if (detailData.data) {
+        setSupplierProducts(detailData.data.products || []);
+        setSupplierPayments(detailData.data.payments || []);
+        setSupplierFinancials(detailData.data.financials || null);
+        setSupplierPurchases(detailData.data.recentPurchases || []);
+      }
       const aData = await aRes.json(); setAllProducts(aData.data || []);
     } catch { toast.error("Failed to load supplier details"); }
     finally { setLoadingDetail(false); }
@@ -155,8 +163,12 @@ export default function SuppliersPage() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
       toast.success("Payment recorded!");
       setPayForm({ amount: "", method: "CASH", notes: "" });
-      const payRes = await fetch(`/api/suppliers/${detailSupplier.id}/payments`);
-      const payData = await payRes.json(); setSupplierPayments(payData.data || []);
+      const detailRes = await fetch(`/api/suppliers/${detailSupplier.id}`);
+      const detailData = await detailRes.json();
+      if (detailData.data) {
+        setSupplierPayments(detailData.data.payments || []);
+        setSupplierFinancials(detailData.data.financials || null);
+      }
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Failed"); }
     finally { setSavingPay(false); }
   };
@@ -351,7 +363,7 @@ export default function SuppliersPage() {
                           <div key={sp.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                             <div>
                               <p className="font-medium text-sm text-slate-700">{sp.product.name}</p>
-                              <p className="text-xs text-slate-400">{sp.product.sku} · Stock: {sp.product.stock} · {formatCurrency(sp.product.sellingPrice)}</p>
+                              <p className="text-xs text-slate-400">{sp.product.sku} · Stock: {sp.product.stock} · {fmt(sp.product.sellingPrice)}</p>
                             </div>
                             <button onClick={() => handleUnlinkProduct(sp.product.id)} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"><Unlink className="h-4 w-4" /></button>
                           </div>
@@ -363,6 +375,25 @@ export default function SuppliersPage() {
 
                 {detailTab === "payments" && (
                   <div className="space-y-4">
+                    {/* Financial Summary */}
+                    {supplierFinancials && (
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-blue-50 rounded-xl p-3 text-center">
+                          <p className="text-xs text-blue-500 font-medium">Total Purchased</p>
+                          <p className="text-sm font-bold text-blue-700 mt-0.5">{fmt(supplierFinancials.totalPurchased)}</p>
+                        </div>
+                        <div className="bg-green-50 rounded-xl p-3 text-center">
+                          <p className="text-xs text-green-500 font-medium">Total Paid</p>
+                          <p className="text-sm font-bold text-green-700 mt-0.5">{fmt(supplierFinancials.totalPaid)}</p>
+                        </div>
+                        <div className={`rounded-xl p-3 text-center ${supplierFinancials.balance > 0 ? "bg-red-50" : "bg-emerald-50"}`}>
+                          <p className={`text-xs font-medium ${supplierFinancials.balance > 0 ? "text-red-500" : "text-emerald-500"}`}>Balance Due</p>
+                          <p className={`text-sm font-bold mt-0.5 ${supplierFinancials.balance > 0 ? "text-red-700" : "text-emerald-700"}`}>{fmt(supplierFinancials.balance)}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Record Payment Form */}
                     <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                       <p className="text-sm font-semibold text-slate-700">Record Payment</p>
                       <div className="grid grid-cols-3 gap-2">
@@ -371,38 +402,66 @@ export default function SuppliersPage() {
                           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="CASH">Cash</SelectItem>
-                            <SelectItem value="CARD">Card</SelectItem>
+                            <SelectItem value="CARD">Card / Bank</SelectItem>
                             <SelectItem value="MIXED">Mixed</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Button onClick={handleAddPayment} disabled={!payForm.amount} loading={savingPay} className="bg-indigo-600 hover:bg-indigo-700 h-9">Add</Button>
+                        <Button onClick={handleAddPayment} disabled={!payForm.amount} loading={savingPay} className="bg-indigo-600 hover:bg-indigo-700 h-9">Record</Button>
                       </div>
                       <Input value={payForm.notes} onChange={(e) => setPayForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Reference / notes..." className="h-9" />
                     </div>
-                    {supplierPayments.length === 0 ? (
-                      <p className="text-center text-slate-400 py-6">No payments recorded</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {supplierPayments.map((pay) => (
-                          <div key={pay.id} className="flex items-center justify-between p-3 border rounded-xl">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${pay.method === "CASH" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"}`}>
-                                {pay.method === "CASH" ? <Banknote className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
-                              </div>
+
+                    {/* Purchase Orders */}
+                    {supplierPurchases.length > 0 && (
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><ShoppingBag className="h-4 w-4 text-slate-400" />Purchase Orders ({supplierPurchases.length})</p>
+                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                          {supplierPurchases.map((po) => (
+                            <div key={po.id} className="flex items-center justify-between p-3 bg-white border rounded-xl text-sm">
                               <div>
-                                <p className="font-semibold text-sm">{formatCurrency(pay.amount)}</p>
-                                <p className="text-xs text-slate-400">{formatDateTime(pay.createdAt)}{pay.notes && ` · ${pay.notes}`}</p>
+                                <p className="font-semibold text-slate-700">{po.purchaseNumber}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  {po.items.reduce((s, i) => s + i.quantity, 0)} units · {new Date(po.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-slate-800">{fmt(Number(po.total))}</p>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                  po.status === "RECEIVED" ? "bg-green-100 text-green-700" :
+                                  po.status === "PENDING" ? "bg-yellow-100 text-yellow-700" :
+                                  "bg-slate-100 text-slate-600"
+                                }`}>{po.status}</span>
                               </div>
                             </div>
-                            <span className="text-xs text-slate-400">{pay.method}</span>
-                          </div>
-                        ))}
-                        <div className="flex justify-between text-sm font-semibold border-t pt-3 mt-2">
-                          <span className="text-slate-600 flex items-center gap-1"><DollarSign className="h-4 w-4" />Total Paid</span>
-                          <span className="text-indigo-600">{formatCurrency(supplierPayments.reduce((s, p) => s + Number(p.amount), 0))}</span>
+                          ))}
                         </div>
                       </div>
                     )}
+
+                    {/* Payment History */}
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Banknote className="h-4 w-4 text-slate-400" />Payment History ({supplierPayments.length})</p>
+                      {supplierPayments.length === 0 ? (
+                        <p className="text-center text-slate-400 py-4 text-sm">No payments recorded yet</p>
+                      ) : (
+                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                          {supplierPayments.map((pay) => (
+                            <div key={pay.id} className="flex items-center justify-between p-3 border rounded-xl">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${pay.method === "CASH" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"}`}>
+                                  {pay.method === "CASH" ? <Banknote className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-sm">{fmt(pay.amount)}</p>
+                                  <p className="text-xs text-slate-400">{formatDateTime(pay.createdAt)}{pay.notes && ` · ${pay.notes}`}</p>
+                                </div>
+                              </div>
+                              <span className="text-xs text-slate-400 font-medium">{pay.method}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </>

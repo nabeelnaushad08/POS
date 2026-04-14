@@ -86,6 +86,8 @@ export default function SettingsPage() {
       } else {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
+        // Notify SettingsProvider to re-fetch globally (currency, theme, etc.)
+        window.dispatchEvent(new CustomEvent("settings-updated"));
         // Apply theme immediately
         if (settings.theme === "dark") {
           document.documentElement.classList.add("dark");
@@ -109,7 +111,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 lg:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">System Settings</h1>

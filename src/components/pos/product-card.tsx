@@ -1,7 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import { Plus, Package } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { Product } from "@/types";
 import Image from "next/image";
 
@@ -13,6 +13,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, onAdd, isInCart, cartQty }: ProductCardProps) {
+  const fmt = useCurrency();
   const isOutOfStock = product.stock === 0;
   const isLowStock = product.stock > 0 && product.stock <= product.minimumStock;
   const price = typeof product.sellingPrice === "string" ? parseFloat(product.sellingPrice) : product.sellingPrice;
@@ -77,7 +78,7 @@ export function ProductCard({ product, onAdd, isInCart, cartQty }: ProductCardPr
           {product.name}
         </p>
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-sm font-bold text-indigo-600">{formatCurrency(price)}</span>
+          <span className="text-sm font-bold text-indigo-600">{fmt(price)}</span>
           <span className="text-xs text-slate-400">×{product.stock}</span>
         </div>
       </div>

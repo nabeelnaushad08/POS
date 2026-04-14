@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart3, Download, FileSpreadsheet, TrendingUp, Package,
-  DollarSign, ShoppingCart, AlertTriangle
+  DollarSign, ShoppingCart, AlertTriangle, Users, Truck, Star
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import toast from "react-hot-toast";
 
 interface SaleReport {
@@ -56,13 +57,72 @@ interface InventoryReport {
   };
 }
 
+interface CustomerReport {
+  customers: Array<{
+    id: string | null;
+    name: string;
+    phone?: string | null;
+    email?: string | null;
+    totalSpend: number;
+    transactions: number;
+    lastPurchase: string;
+  }>;
+  summary: {
+    totalCustomers: number;
+    totalRevenue: number;
+    avgSpend: number;
+    topCustomer: { name: string; totalSpend: number } | null;
+  };
+}
+
+interface SupplierReport {
+  suppliers: Array<{
+    id: string;
+    name: string;
+    contactPerson?: string | null;
+    phone?: string | null;
+    purchaseCount: number;
+    totalPurchased: number;
+    totalPaid: number;
+    balance: number;
+  }>;
+  summary: {
+    totalSuppliers: number;
+    totalPurchased: number;
+    totalPaid: number;
+    totalBalance: number;
+  };
+}
+
+interface ProductPerformanceReport {
+  products: Array<{
+    productId: string | null;
+    name: string;
+    unitsSold: number;
+    revenue: number;
+    cost: number;
+    profit: number;
+  }>;
+  summary: {
+    totalProducts: number;
+    totalRevenue: number;
+    totalProfit: number;
+    totalUnitsSold: number;
+    topProduct: { name: string; revenue: number } | null;
+  };
+}
+
 export default function ReportsPage() {
+  const fmt = useCurrency();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [salesReport, setSalesReport] = useState<{ sales: SaleReport[]; summary: { totalRevenue: number; totalTransactions: number; totalDiscount: number; totalTax: number } } | null>(null);
   const [profitReport, setProfitReport] = useState<ProfitReport | null>(null);
   const [inventoryReport, setInventoryReport] = useState<InventoryReport | null>(null);
+  const [customerReport, setCustomerReport] = useState<CustomerReport | null>(null);
+  const [supplierReport, setSupplierReport] = useState<SupplierReport | null>(null);
+  const [productReport, setProductReport] = useState<ProductPerformanceReport | null>(null);
 
   const fetchReport = async (type: string) => {
     setLoading(true);
@@ -78,6 +138,9 @@ export default function ReportsPage() {
       if (type === "sales") setSalesReport(data);
       else if (type === "profit") setProfitReport(data);
       else if (type === "inventory") setInventoryReport(data);
+      else if (type === "customers") setCustomerReport(data);
+      else if (type === "suppliers") setSupplierReport(data);
+      else if (type === "products") setProductReport(data);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to load report");
     } finally {
@@ -150,7 +213,7 @@ export default function ReportsPage() {
             s.receiptNumber,
             formatDate(s.createdAt),
             s.user?.name || "",
-            formatCurrency(Number(s.total)),
+            fmt(Number(s.total)),
             s.paymentMethod,
             s.status,
           ]),
@@ -166,9 +229,9 @@ export default function ReportsPage() {
             p.sku,
             p.category?.name || "",
             p.stock,
-            formatCurrency(Number(p.costPrice)),
-            formatCurrency(Number(p.sellingPrice)),
-            formatCurrency(Number(p.costPrice) * p.stock),
+            fmt(Number(p.costPrice)),
+            fmt(Number(p.sellingPrice)),
+            fmt(Number(p.costPrice) * p.stock),
           ]),
           styles: { fontSize: 9 },
           headStyles: { fillColor: [99, 102, 241] },
@@ -203,7 +266,7 @@ export default function ReportsPage() {
       </div>
 
       <Tabs defaultValue="sales" onValueChange={fetchReport}>
-        <TabsList className="bg-white border shadow-sm">
+        <TabsList className="bg-white border shadow-sm flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="sales" className="gap-2">
             <ShoppingCart className="h-4 w-4" /> Sales
           </TabsTrigger>
@@ -212,6 +275,15 @@ export default function ReportsPage() {
           </TabsTrigger>
           <TabsTrigger value="inventory" className="gap-2">
             <Package className="h-4 w-4" /> Inventory
+          </TabsTrigger>
+          <TabsTrigger value="customers" className="gap-2">
+            <Users className="h-4 w-4" /> Customers
+          </TabsTrigger>
+          <TabsTrigger value="suppliers" className="gap-2">
+            <Truck className="h-4 w-4" /> Suppliers
+          </TabsTrigger>
+          <TabsTrigger value="products" className="gap-2">
+            <Star className="h-4 w-4" /> Products
           </TabsTrigger>
         </TabsList>
 
@@ -237,10 +309,10 @@ export default function ReportsPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Total Revenue", value: formatCurrency(salesReport.summary.totalRevenue), icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
+                  { label: "Total Revenue", value: fmt(salesReport.summary.totalRevenue), icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
                   { label: "Transactions", value: salesReport.summary.totalTransactions, icon: ShoppingCart, color: "text-blue-600 bg-blue-50" },
-                  { label: "Total Discount", value: formatCurrency(salesReport.summary.totalDiscount), icon: TrendingUp, color: "text-amber-600 bg-amber-50" },
-                  { label: "Total Tax", value: formatCurrency(salesReport.summary.totalTax), icon: BarChart3, color: "text-purple-600 bg-purple-50" },
+                  { label: "Total Discount", value: fmt(salesReport.summary.totalDiscount), icon: TrendingUp, color: "text-amber-600 bg-amber-50" },
+                  { label: "Total Tax", value: fmt(salesReport.summary.totalTax), icon: BarChart3, color: "text-purple-600 bg-purple-50" },
                 ].map((stat) => (
                   <Card key={stat.label}>
                     <CardContent className="p-4">
@@ -277,7 +349,7 @@ export default function ReportsPage() {
                           <td className="px-5 py-3 font-mono text-xs">{sale.receiptNumber}</td>
                           <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">{formatDate(sale.createdAt)}</td>
                           <td className="px-4 py-3 hidden md:table-cell">{sale.user?.name}</td>
-                          <td className="px-4 py-3 text-right font-semibold">{formatCurrency(Number(sale.total))}</td>
+                          <td className="px-4 py-3 text-right font-semibold">{fmt(Number(sale.total))}</td>
                           <td className="px-4 py-3 text-center hidden lg:table-cell">
                             <Badge variant="info">{sale.paymentMethod}</Badge>
                           </td>
@@ -306,9 +378,9 @@ export default function ReportsPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Total Revenue", value: formatCurrency(profitReport.summary.totalRevenue), color: "bg-emerald-50 text-emerald-600" },
-                  { label: "Total Cost", value: formatCurrency(profitReport.summary.totalCost), color: "bg-red-50 text-red-600" },
-                  { label: "Gross Profit", value: formatCurrency(profitReport.summary.totalProfit), color: "bg-blue-50 text-blue-600" },
+                  { label: "Total Revenue", value: fmt(profitReport.summary.totalRevenue), color: "bg-emerald-50 text-emerald-600" },
+                  { label: "Total Cost", value: fmt(profitReport.summary.totalCost), color: "bg-red-50 text-red-600" },
+                  { label: "Gross Profit", value: fmt(profitReport.summary.totalProfit), color: "bg-blue-50 text-blue-600" },
                   { label: "Profit Margin", value: `${profitReport.summary.profitMargin.toFixed(1)}%`, color: "bg-purple-50 text-purple-600" },
                 ].map((stat) => (
                   <Card key={stat.label} className={`${stat.color.split(" ")[0]}`}>
@@ -346,8 +418,8 @@ export default function ReportsPage() {
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 {[
                   { label: "Total Products", value: inventoryReport.summary.totalProducts, color: "text-slate-700" },
-                  { label: "Stock Value (Cost)", value: formatCurrency(inventoryReport.summary.totalValue), color: "text-blue-600" },
-                  { label: "Retail Value", value: formatCurrency(inventoryReport.summary.totalRetailValue), color: "text-emerald-600" },
+                  { label: "Stock Value (Cost)", value: fmt(inventoryReport.summary.totalValue), color: "text-blue-600" },
+                  { label: "Retail Value", value: fmt(inventoryReport.summary.totalRetailValue), color: "text-emerald-600" },
                   { label: "Low Stock", value: inventoryReport.summary.lowStockCount, color: "text-amber-600" },
                   { label: "Out of Stock", value: inventoryReport.summary.outOfStockCount, color: "text-red-600" },
                 ].map((stat) => (
@@ -392,9 +464,294 @@ export default function ReportsPage() {
                               {product.stock}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-right text-slate-500 hidden sm:table-cell">{formatCurrency(Number(product.costPrice))}</td>
-                          <td className="px-4 py-3 text-right font-semibold">{formatCurrency(Number(product.sellingPrice))}</td>
-                          <td className="px-5 py-3 text-right text-slate-600 hidden md:table-cell">{formatCurrency(Number(product.costPrice) * product.stock)}</td>
+                          <td className="px-4 py-3 text-right text-slate-500 hidden sm:table-cell">{fmt(Number(product.costPrice))}</td>
+                          <td className="px-4 py-3 text-right font-semibold">{fmt(Number(product.sellingPrice))}</td>
+                          <td className="px-5 py-3 text-right text-slate-600 hidden md:table-cell">{fmt(Number(product.costPrice) * product.stock)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </TabsContent>
+        {/* Customers Report */}
+        <TabsContent value="customers" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <Button onClick={() => fetchReport("customers")} loading={loading} variant="outline">
+              <BarChart3 className="h-4 w-4 mr-2" /> Generate Report
+            </Button>
+            {customerReport && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => {
+                  import("xlsx").then((XLSX) => {
+                    const ws = XLSX.utils.json_to_sheet(customerReport.customers.map((c) => ({
+                      Name: c.name,
+                      Phone: c.phone || "",
+                      Email: c.email || "",
+                      Transactions: c.transactions,
+                      "Total Spend": c.totalSpend,
+                      "Last Purchase": formatDate(c.lastPurchase),
+                    })));
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Customers");
+                    XLSX.writeFile(wb, "customers-report.xlsx");
+                    toast.success("Report exported!");
+                  });
+                }}>
+                  <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Excel
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {customerReport && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Total Customers", value: customerReport.summary.totalCustomers, icon: Users, color: "text-blue-600 bg-blue-50" },
+                  { label: "Total Revenue", value: fmt(customerReport.summary.totalRevenue), icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
+                  { label: "Avg. Spend/Customer", value: fmt(customerReport.summary.avgSpend), icon: TrendingUp, color: "text-purple-600 bg-purple-50" },
+                  { label: "Top Customer", value: customerReport.summary.topCustomer?.name || "—", icon: Star, color: "text-amber-600 bg-amber-50" },
+                ].map((stat) => (
+                  <Card key={stat.label}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl ${stat.color.split(" ")[1]}`}>
+                          <stat.icon className={`h-5 w-5 ${stat.color.split(" ")[0]}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500">{stat.label}</p>
+                          <p className="font-bold text-slate-800 truncate">{stat.value}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b">
+                        <th className="text-left px-5 py-3 text-xs text-slate-500 font-semibold">Customer</th>
+                        <th className="text-left px-4 py-3 text-xs text-slate-500 font-semibold hidden md:table-cell">Contact</th>
+                        <th className="text-center px-4 py-3 text-xs text-slate-500 font-semibold">Orders</th>
+                        <th className="text-right px-4 py-3 text-xs text-slate-500 font-semibold">Total Spend</th>
+                        <th className="text-right px-5 py-3 text-xs text-slate-500 font-semibold hidden sm:table-cell">Last Purchase</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customerReport.customers.map((c, idx) => (
+                        <tr key={c.id || c.name + idx} className="border-b last:border-0 hover:bg-slate-50">
+                          <td className="px-5 py-3 font-medium text-slate-800">
+                            {idx === 0 && <Star className="inline h-3.5 w-3.5 text-amber-400 mr-1 mb-0.5" />}
+                            {c.name}
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">
+                            {c.phone || "—"}{c.email ? ` · ${c.email}` : ""}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant="info">{c.transactions}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(c.totalSpend)}</td>
+                          <td className="px-5 py-3 text-right text-slate-500 text-xs hidden sm:table-cell">{formatDate(c.lastPurchase)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </TabsContent>
+
+        {/* Suppliers Report */}
+        <TabsContent value="suppliers" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <Button onClick={() => fetchReport("suppliers")} loading={loading} variant="outline">
+              <BarChart3 className="h-4 w-4 mr-2" /> Generate Report
+            </Button>
+            {supplierReport && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => {
+                  import("xlsx").then((XLSX) => {
+                    const ws = XLSX.utils.json_to_sheet(supplierReport.suppliers.map((s) => ({
+                      Supplier: s.name,
+                      Contact: s.contactPerson || "",
+                      Phone: s.phone || "",
+                      "Purchase Count": s.purchaseCount,
+                      "Total Purchased": s.totalPurchased,
+                      "Total Paid": s.totalPaid,
+                      "Balance Due": s.balance,
+                    })));
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Suppliers");
+                    XLSX.writeFile(wb, "suppliers-report.xlsx");
+                    toast.success("Report exported!");
+                  });
+                }}>
+                  <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Excel
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {supplierReport && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Total Suppliers", value: supplierReport.summary.totalSuppliers, icon: Truck, color: "text-blue-600 bg-blue-50" },
+                  { label: "Total Purchased", value: fmt(supplierReport.summary.totalPurchased), icon: ShoppingCart, color: "text-purple-600 bg-purple-50" },
+                  { label: "Total Paid", value: fmt(supplierReport.summary.totalPaid), icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
+                  { label: "Outstanding Balance", value: fmt(supplierReport.summary.totalBalance), icon: AlertTriangle, color: "text-red-600 bg-red-50" },
+                ].map((stat) => (
+                  <Card key={stat.label}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl ${stat.color.split(" ")[1]}`}>
+                          <stat.icon className={`h-5 w-5 ${stat.color.split(" ")[0]}`} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">{stat.label}</p>
+                          <p className="font-bold text-slate-800">{stat.value}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b">
+                        <th className="text-left px-5 py-3 text-xs text-slate-500 font-semibold">Supplier</th>
+                        <th className="text-left px-4 py-3 text-xs text-slate-500 font-semibold hidden md:table-cell">Contact</th>
+                        <th className="text-center px-4 py-3 text-xs text-slate-500 font-semibold">Orders</th>
+                        <th className="text-right px-4 py-3 text-xs text-slate-500 font-semibold">Purchased</th>
+                        <th className="text-right px-4 py-3 text-xs text-slate-500 font-semibold hidden sm:table-cell">Paid</th>
+                        <th className="text-right px-5 py-3 text-xs text-slate-500 font-semibold">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {supplierReport.suppliers.map((s) => (
+                        <tr key={s.id} className="border-b last:border-0 hover:bg-slate-50">
+                          <td className="px-5 py-3 font-medium text-slate-800">{s.name}</td>
+                          <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">
+                            {s.contactPerson || "—"}{s.phone ? ` · ${s.phone}` : ""}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant="info">{s.purchaseCount}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(s.totalPurchased)}</td>
+                          <td className="px-4 py-3 text-right text-emerald-600 hidden sm:table-cell">{fmt(s.totalPaid)}</td>
+                          <td className="px-5 py-3 text-right">
+                            <span className={s.balance > 0 ? "text-red-600 font-semibold" : "text-emerald-600"}>
+                              {fmt(s.balance)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </TabsContent>
+
+        {/* Products Performance Report */}
+        <TabsContent value="products" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <Button onClick={() => fetchReport("products")} loading={loading} variant="outline">
+              <BarChart3 className="h-4 w-4 mr-2" /> Generate Report
+            </Button>
+            {productReport && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => {
+                  import("xlsx").then((XLSX) => {
+                    const ws = XLSX.utils.json_to_sheet(productReport.products.map((p) => ({
+                      Product: p.name,
+                      "Units Sold": p.unitsSold,
+                      Revenue: p.revenue,
+                      Cost: p.cost,
+                      Profit: p.profit,
+                      "Margin %": p.revenue > 0 ? ((p.profit / p.revenue) * 100).toFixed(1) + "%" : "0%",
+                    })));
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Products");
+                    XLSX.writeFile(wb, "products-performance.xlsx");
+                    toast.success("Report exported!");
+                  });
+                }}>
+                  <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Excel
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {productReport && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Products Sold", value: productReport.summary.totalProducts, icon: Package, color: "text-blue-600 bg-blue-50" },
+                  { label: "Total Revenue", value: fmt(productReport.summary.totalRevenue), icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
+                  { label: "Total Profit", value: fmt(productReport.summary.totalProfit), icon: TrendingUp, color: "text-purple-600 bg-purple-50" },
+                  { label: "Units Sold", value: productReport.summary.totalUnitsSold, icon: ShoppingCart, color: "text-amber-600 bg-amber-50" },
+                ].map((stat) => (
+                  <Card key={stat.label}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl ${stat.color.split(" ")[1]}`}>
+                          <stat.icon className={`h-5 w-5 ${stat.color.split(" ")[0]}`} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">{stat.label}</p>
+                          <p className="font-bold text-slate-800">{stat.value}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b">
+                        <th className="text-left px-5 py-3 text-xs text-slate-500 font-semibold">Product</th>
+                        <th className="text-center px-4 py-3 text-xs text-slate-500 font-semibold">Units Sold</th>
+                        <th className="text-right px-4 py-3 text-xs text-slate-500 font-semibold">Revenue</th>
+                        <th className="text-right px-4 py-3 text-xs text-slate-500 font-semibold hidden sm:table-cell">Cost</th>
+                        <th className="text-right px-4 py-3 text-xs text-slate-500 font-semibold">Profit</th>
+                        <th className="text-right px-5 py-3 text-xs text-slate-500 font-semibold hidden md:table-cell">Margin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productReport.products.map((p, idx) => (
+                        <tr key={p.productId || p.name + idx} className="border-b last:border-0 hover:bg-slate-50">
+                          <td className="px-5 py-3 font-medium text-slate-800">
+                            {idx === 0 && <Star className="inline h-3.5 w-3.5 text-amber-400 mr-1 mb-0.5" />}
+                            {p.name}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant="info">{p.unitsSold}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(p.revenue)}</td>
+                          <td className="px-4 py-3 text-right text-slate-500 hidden sm:table-cell">{fmt(p.cost)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={p.profit >= 0 ? "text-emerald-600 font-semibold" : "text-red-600 font-semibold"}>
+                              {fmt(p.profit)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-right text-slate-500 hidden md:table-cell">
+                            {p.revenue > 0 ? ((p.profit / p.revenue) * 100).toFixed(1) + "%" : "0%"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

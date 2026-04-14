@@ -13,7 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { Customer } from "@/types";
 import toast from "react-hot-toast";
 
@@ -40,6 +41,7 @@ function validatePhone(phone: string): boolean {
 }
 
 export default function CustomersPage() {
+  const fmt = useCurrency();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

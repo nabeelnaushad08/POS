@@ -6,7 +6,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import { CreditCard, Banknote, Blend, Search, X } from "lucide-react";
 import type { CartItem } from "@/types";
 
@@ -42,6 +42,7 @@ interface CheckoutModalProps {
 }
 
 export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: CheckoutModalProps) {
+  const fmt = useCurrency();
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [discount, setDiscount] = useState("0");
@@ -147,30 +148,30 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
               {items.map((item) => (
                 <div key={item.productId} className="flex justify-between text-sm">
                   <span className="text-slate-600 truncate flex-1 mr-2">{item.name} × {item.quantity}</span>
-                  <span className="text-slate-800 font-medium">{formatCurrency(item.price * item.quantity)}</span>
+                  <span className="text-slate-800 font-medium">{fmt(item.price * item.quantity)}</span>
                 </div>
               ))}
             </div>
             <div className="border-t pt-2 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
+                <span>{fmt(subtotal)}</span>
               </div>
               {discountNum > 0 && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span>Discount</span>
-                  <span>-{formatCurrency(discountNum)}</span>
+                  <span>-{fmt(discountNum)}</span>
                 </div>
               )}
               {taxNum > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Tax</span>
-                  <span>{formatCurrency(taxNum)}</span>
+                  <span>{fmt(taxNum)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-base">
                 <span>Total</span>
-                <span className="text-indigo-600">{formatCurrency(total)}</span>
+                <span className="text-indigo-600">{fmt(total)}</span>
               </div>
             </div>
           </div>
@@ -219,7 +220,7 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
                 value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} className="mt-1" />
               {cashNum >= total && cashNum > 0 && (
                 <p className="text-sm text-green-600 mt-1 font-medium">
-                  Change: {formatCurrency(change)}
+                  Change: {fmt(change)}
                 </p>
               )}
             </div>
@@ -243,7 +244,7 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
                   value={cardAmount} onChange={(e) => setCardAmount(e.target.value)} className="mt-1" />
               </div>
               <div className="col-span-2 text-sm text-slate-500">
-                Combined: {formatCurrency(cashNum + cardNum)} / {formatCurrency(total)}
+                Combined: {fmt(cashNum + cardNum)} / {fmt(total)}
               </div>
             </div>
           )}
@@ -344,7 +345,7 @@ export function CheckoutModal({ open, onClose, items, subtotal, onConfirm }: Che
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
             <Button type="submit" loading={loading} className="bg-indigo-600 hover:bg-indigo-700 min-w-[120px]">
-              {loading ? "Processing..." : `Pay ${formatCurrency(total)}`}
+              {loading ? "Processing..." : `Pay ${fmt(total)}`}
             </Button>
           </DialogFooter>
         </form>

@@ -1,9 +1,9 @@
 "use client";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 import { Bell, LogOut, User, Settings, ChevronDown } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,19 @@ export function Header({ title, lowStockCount = 0 }: HeaderProps) {
   const { data: session } = useSession();
   const user = session?.user;
   const role = (user as { role?: string })?.role || "CASHIER";
+  const [liveStockCount, setLiveStockCount] = useState(lowStockCount);
+
+  useEffect(() => {
+    const refresh = () => {
+      fetch("/api/dashboard")
+        .then((r) => r.json())
+        .then((d) => { if (typeof d.lowStockCount === "number") setLiveStockCount(d.lowStockCount); })
+        .catch(() => {});
+    };
+    refresh();
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  }, []);
 
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -36,21 +49,21 @@ export function Header({ title, lowStockCount = 0 }: HeaderProps) {
   };
 
   return (
-    <header className="h-16 border-b bg-white flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
+    <header className="h-16 border-b bg-white dark:bg-gray-900 dark:border-gray-700 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
       <div className="flex items-center gap-3">
         <MobileSidebar role={role} />
         {title && (
-          <h1 className="text-xl font-semibold text-slate-800 hidden sm:block">{title}</h1>
+          <h1 className="text-xl font-semibold text-slate-800 dark:text-white hidden sm:block">{title}</h1>
         )}
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Low stock alert bell */}
-        <Link href="/notifications" className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
+        {/* Live low stock alert bell */}
+        <Link href="/notifications" className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors">
           <Bell className="h-5 w-5" />
-          {lowStockCount > 0 && (
+          {liveStockCount > 0 && (
             <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-              {lowStockCount > 9 ? "9+" : lowStockCount}
+              {liveStockCount > 9 ? "9+" : liveStockCount}
             </span>
           )}
         </Link>
@@ -58,14 +71,14 @@ export function Header({ title, lowStockCount = 0 }: HeaderProps) {
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 transition-colors">
+            <button className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-indigo-100 text-indigo-700 text-sm font-medium">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden sm:flex flex-col items-start">
-                <span className="text-sm font-medium text-slate-800 leading-tight">{user?.name}</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-white leading-tight">{user?.name}</span>
                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${roleColors[role] || "bg-gray-100 text-gray-600"}`}>
                   {role}
                 </span>
@@ -87,7 +100,7 @@ export function Header({ title, lowStockCount = 0 }: HeaderProps) {
             </DropdownMenuItem>
             {role === "ADMIN" && (
               <DropdownMenuItem asChild>
-                <Link href="/users" className="cursor-pointer">
+                <Link href="/settings" className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </Link>

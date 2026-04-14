@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { Purchase, Supplier, Product } from "@/types";
 import toast from "react-hot-toast";
 
@@ -24,6 +25,7 @@ const STATUS_COLORS: Record<string, string> = {
 interface PurchaseItemRow { productId: string; productName: string; sku: string; quantity: string; unitCost: string; currentStock: number; }
 
 export default function PurchasesPage() {
+  const fmt = useCurrency();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -152,8 +154,8 @@ export default function PurchasesPage() {
   const printPurchase = (p: Purchase) => {
     const win = window.open("", "_blank", "width=400,height=600");
     if (!win) return;
-    const items = (p.items || []).map((item) => `<tr><td>${item.productName}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">${formatCurrency(item.unitCost)}</td><td style="text-align:right">${formatCurrency(item.subtotal)}</td></tr>`).join("");
-    win.document.write(`<html><head><title>Purchase Receipt</title><style>body{font-family:monospace;font-size:12px;width:300px;margin:0 auto;padding:10px} table{width:100%;border-collapse:collapse} td{padding:3px 4px;border-bottom:1px dashed #ccc} .total{font-weight:bold;font-size:14px} .center{text-align:center} .right{text-align:right} h2{text-align:center;margin:0} hr{border:1px dashed #000}</style></head><body><h2>PURCHASE ORDER</h2><p class="center">${p.purchaseNumber}</p><hr/><p><b>Supplier:</b> ${p.supplier?.name || ""}<br/>${p.supplier?.phone ? `Phone: ${p.supplier.phone}` : ""}</p><hr/><p><b>Date:</b> ${formatDateTime(p.createdAt)}</p><hr/><table><tr><th style="text-align:left">Product</th><th style="text-align:center">Qty</th><th style="text-align:right">Cost</th><th style="text-align:right">Total</th></tr>${items}</table><hr/><p class="right">Subtotal: ${formatCurrency(p.subtotal)}</p>${Number(p.discount) > 0 ? `<p class="right">Discount: -${formatCurrency(p.discount)}</p>` : ""}<p class="right total">Total: ${formatCurrency(p.total)}</p><hr/><p class="center">Authorized Signature: ____________</p></body></html>`);
+    const items = (p.items || []).map((item) => `<tr><td>${item.productName}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:right">${fmt(item.unitCost)}</td><td style="text-align:right">${fmt(item.subtotal)}</td></tr>`).join("");
+    win.document.write(`<html><head><title>Purchase Receipt</title><style>body{font-family:monospace;font-size:12px;width:300px;margin:0 auto;padding:10px} table{width:100%;border-collapse:collapse} td{padding:3px 4px;border-bottom:1px dashed #ccc} .total{font-weight:bold;font-size:14px} .center{text-align:center} .right{text-align:right} h2{text-align:center;margin:0} hr{border:1px dashed #000}</style></head><body><h2>PURCHASE ORDER</h2><p class="center">${p.purchaseNumber}</p><hr/><p><b>Supplier:</b> ${p.supplier?.name || ""}<br/>${p.supplier?.phone ? `Phone: ${p.supplier.phone}` : ""}</p><hr/><p><b>Date:</b> ${formatDateTime(p.createdAt)}</p><hr/><table><tr><th style="text-align:left">Product</th><th style="text-align:center">Qty</th><th style="text-align:right">Cost</th><th style="text-align:right">Total</th></tr>${items}</table><hr/><p class="right">Subtotal: ${fmt(p.subtotal)}</p>${Number(p.discount) > 0 ? `<p class="right">Discount: -${fmt(p.discount)}</p>` : ""}<p class="right total">Total: ${fmt(p.total)}</p><hr/><p class="center">Authorized Signature: ____________</p></body></html>`);
     win.document.close(); win.print();
   };
 
@@ -216,7 +218,7 @@ export default function PurchasesPage() {
                   <td className="px-4 py-3 text-center text-slate-500 hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1"><Package className="h-3.5 w-3.5 text-slate-400" />{(p as Purchase & { _count?: { items: number } })._count?.items ?? 0}</span>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatCurrency(p.total)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(p.total)}</td>
                   <td className="px-4 py-3 text-center"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status] || ""}`}>{p.status}</span></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
@@ -303,7 +305,7 @@ export default function PurchasesPage() {
                           <td className="px-3 py-2"><Input type="number" min={1} value={row.quantity} onChange={(e) => updateRow(i, "quantity", e.target.value)} placeholder="0" className="h-8 text-right w-24 ml-auto" /></td>
                           <td className="px-3 py-2"><Input type="number" min={0} step={0.01} value={row.unitCost} onChange={(e) => updateRow(i, "unitCost", e.target.value)} placeholder="0.00" className="h-8 text-right w-28 ml-auto" /></td>
                           <td className="px-3 py-2 text-right font-medium text-slate-700">
-                            {row.quantity && row.unitCost ? formatCurrency((parseFloat(row.quantity) || 0) * (parseFloat(row.unitCost) || 0)) : "—"}
+                            {row.quantity && row.unitCost ? fmt((parseFloat(row.quantity) || 0) * (parseFloat(row.unitCost) || 0)) : "—"}
                           </td>
                           <td className="px-2 py-2"><button onClick={() => removeRow(i)} className="p-1 rounded text-slate-300 hover:text-red-500 transition-colors"><X className="h-4 w-4" /></button></td>
                         </tr>
@@ -326,9 +328,9 @@ export default function PurchasesPage() {
 
               {activeRows.length > 0 && (
                 <div className="bg-indigo-50 rounded-xl p-4 space-y-1.5 text-sm">
-                  <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-                  {discountNum > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-{formatCurrency(discountNum)}</span></div>}
-                  <div className="flex justify-between font-bold text-base pt-1 border-t"><span>Total</span><span className="text-indigo-700">{formatCurrency(total)}</span></div>
+                  <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+                  {discountNum > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-{fmt(discountNum)}</span></div>}
+                  <div className="flex justify-between font-bold text-base pt-1 border-t"><span>Total</span><span className="text-indigo-700">{fmt(total)}</span></div>
                   <p className="text-xs text-slate-400 pt-1 flex items-center gap-1"><TrendingDown className="h-3.5 w-3.5" />{activeRows.length} product(s) · stock will be incremented on save</p>
                 </div>
               )}
@@ -338,7 +340,7 @@ export default function PurchasesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
             {step === 2 && <Button onClick={handleCreate} loading={creating} disabled={activeRows.length === 0} className="bg-indigo-600 hover:bg-indigo-700">
-              {creating ? "Creating..." : `Create Purchase (${formatCurrency(total)})`}
+              {creating ? "Creating..." : `Create Purchase (${fmt(total)})`}
             </Button>}
           </DialogFooter>
         </DialogContent>
@@ -371,17 +373,17 @@ export default function PurchasesPage() {
                       <tr key={item.id} className="border-b last:border-0">
                         <td className="px-3 py-2"><p className="font-medium text-slate-700">{item.productName}</p><p className="text-xs text-slate-400">{item.sku}</p></td>
                         <td className="px-3 py-2 text-center">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(item.unitCost)}</td>
-                        <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.subtotal)}</td>
+                        <td className="px-3 py-2 text-right text-slate-600">{fmt(item.unitCost)}</td>
+                        <td className="px-3 py-2 text-right font-semibold">{fmt(item.subtotal)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="space-y-1.5 text-sm border-t pt-3">
-                <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatCurrency(viewPurchase.subtotal)}</span></div>
-                {Number(viewPurchase.discount) > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-{formatCurrency(viewPurchase.discount)}</span></div>}
-                <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span className="text-indigo-600">{formatCurrency(viewPurchase.total)}</span></div>
+                <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{fmt(viewPurchase.subtotal)}</span></div>
+                {Number(viewPurchase.discount) > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-{fmt(viewPurchase.discount)}</span></div>}
+                <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span className="text-indigo-600">{fmt(viewPurchase.total)}</span></div>
               </div>
             </div>
             <DialogFooter className="gap-2">

@@ -2,7 +2,8 @@
 import { useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
+import { useCurrency, useSettings } from "@/lib/settings-context";
 import { Printer, Download, X } from "lucide-react";
 import type { Sale } from "@/types";
 
@@ -13,6 +14,8 @@ interface ReceiptProps {
 
 export function Receipt({ sale, onClose }: ReceiptProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const fmt = useCurrency();
+  const { systemName, currencySymbol } = useSettings();
 
   const handlePrint = () => {
     const content = printRef.current?.innerHTML;
@@ -41,13 +44,16 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
   };
 
   const handleDownloadPDF = async () => {
+    const sym = currencySymbol;
+    const { formatAmount } = await import("@/lib/utils");
+    const f = (n: number | string) => formatAmount(n, sym);
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: [80, 200] });
 
     let y = 10;
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("POS SYSTEM", 40, y, { align: "center" });
+    doc.text(systemName || "POS SYSTEM", 40, y, { align: "center" });
 
     y += 7;
     doc.setFontSize(10);
@@ -64,11 +70,11 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
     doc.setFontSize(9);
     (sale.items || []).forEach((item) => {
       const name = item.productName.substring(0, 20);
-      const amount = formatCurrency(Number(item.subtotal));
+      const amount = f(Number(item.subtotal));
       doc.text(`${name}`, 5, y);
       doc.text(amount, 75, y, { align: "right" });
       y += 4;
-      doc.text(`  ${item.quantity} × ${formatCurrency(Number(item.unitPrice))}`, 5, y);
+      doc.text(`  ${item.quantity} × ${f(Number(item.unitPrice))}`, 5, y);
       y += 5;
     });
 
@@ -77,19 +83,19 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
 
     if (Number(sale.discount) > 0) {
       doc.text("Discount:", 5, y);
-      doc.text(`-${formatCurrency(Number(sale.discount))}`, 75, y, { align: "right" });
+      doc.text(`-${f(Number(sale.discount))}`, 75, y, { align: "right" });
       y += 5;
     }
     if (Number(sale.tax) > 0) {
       doc.text("Tax:", 5, y);
-      doc.text(formatCurrency(Number(sale.tax)), 75, y, { align: "right" });
+      doc.text(f(Number(sale.tax)), 75, y, { align: "right" });
       y += 5;
     }
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text("TOTAL:", 5, y);
-    doc.text(formatCurrency(Number(sale.total)), 75, y, { align: "right" });
+    doc.text(f(Number(sale.total)), 75, y, { align: "right" });
     y += 7;
 
     doc.setFont("helvetica", "normal");
@@ -97,7 +103,7 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
     doc.text(`Payment: ${sale.paymentMethod}`, 40, y, { align: "center" });
     if (Number(sale.change) > 0) {
       y += 4;
-      doc.text(`Change: ${formatCurrency(Number(sale.change))}`, 40, y, { align: "center" });
+      doc.text(`Change: ${f(Number(sale.change))}`, 40, y, { align: "center" });
     }
 
     y += 7;
@@ -126,7 +132,7 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
       {/* Printable receipt */}
       <div ref={printRef} className="p-5">
         <div className="text-center mb-4">
-          <p className="font-bold text-lg">POS SYSTEM</p>
+          <p className="font-bold text-lg">{systemName || "POS SYSTEM"}</p>
           <p className="text-sm text-slate-500">{formatDateTime(sale.createdAt)}</p>
           <p className="text-xs text-slate-400">{sale.receiptNumber}</p>
           {sale.customerName && (
@@ -141,10 +147,10 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
             <div key={i}>
               <div className="flex justify-between text-sm font-medium">
                 <span className="truncate flex-1 mr-2">{item.productName}</span>
-                <span>{formatCurrency(Number(item.subtotal))}</span>
+                <span>{fmt(Number(item.subtotal))}</span>
               </div>
               <div className="flex justify-between text-xs text-slate-500">
-                <span>{item.quantity} × {formatCurrency(Number(item.unitPrice))}</span>
+                <span>{item.quantity} × {fmt(Number(item.unitPrice))}</span>
               </div>
             </div>
           ))}
@@ -155,23 +161,23 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-500">Subtotal</span>
-            <span>{formatCurrency(Number(sale.subtotal))}</span>
+            <span>{fmt(Number(sale.subtotal))}</span>
           </div>
           {Number(sale.discount) > 0 && (
             <div className="flex justify-between text-green-600">
               <span>Discount</span>
-              <span>-{formatCurrency(Number(sale.discount))}</span>
+              <span>-{fmt(Number(sale.discount))}</span>
             </div>
           )}
           {Number(sale.tax) > 0 && (
             <div className="flex justify-between">
               <span className="text-slate-500">Tax</span>
-              <span>{formatCurrency(Number(sale.tax))}</span>
+              <span>{fmt(Number(sale.tax))}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-base pt-1 border-t">
             <span>TOTAL</span>
-            <span className="text-indigo-600">{formatCurrency(Number(sale.total))}</span>
+            <span className="text-indigo-600">{fmt(Number(sale.total))}</span>
           </div>
         </div>
 
@@ -180,7 +186,7 @@ export function Receipt({ sale, onClose }: ReceiptProps) {
         <div className="text-sm text-slate-600 space-y-0.5 text-center">
           <p>Payment: <span className="font-medium">{sale.paymentMethod}</span></p>
           {Number(sale.change) > 0 && (
-            <p>Change: <span className="font-medium text-green-600">{formatCurrency(Number(sale.change))}</span></p>
+            <p>Change: <span className="font-medium text-green-600">{fmt(Number(sale.change))}</span></p>
           )}
         </div>
 

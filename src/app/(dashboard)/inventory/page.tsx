@@ -11,12 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductFormModal } from "@/components/inventory/product-form-modal";
 import { BulkImportModal } from "@/components/inventory/bulk-import-modal";
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { Product, Category } from "@/types";
 import toast from "react-hot-toast";
 import Image from "next/image";
 
 export default function InventoryPage() {
+  const fmt = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,10 +214,10 @@ export default function InventoryPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-slate-600">
-                      {formatCurrency(Number(product.costPrice))}
+                      {fmt(Number(product.costPrice))}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                      {formatCurrency(Number(product.sellingPrice))}
+                      {fmt(Number(product.sellingPrice))}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {getStockBadge(product.stock, product.minimumStock)}

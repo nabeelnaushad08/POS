@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { Sale } from "@/types";
 import toast from "react-hot-toast";
 
@@ -26,6 +27,7 @@ const PAY_COLORS: Record<string, string> = {
 };
 
 export default function SalesPage() {
+  const fmt = useCurrency();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -124,9 +126,9 @@ export default function SalesPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Revenue (current view)", value: formatCurrency(totalRevenue), icon: TrendingUp, color: "text-emerald-600" },
+          { label: "Revenue (current view)", value: fmt(totalRevenue), icon: TrendingUp, color: "text-emerald-600" },
           { label: "Transactions", value: String(sales.length), icon: ShoppingCart, color: "text-blue-600" },
-          { label: "Average Sale", value: formatCurrency(avgSale), icon: Receipt, color: "text-indigo-600" },
+          { label: "Average Sale", value: fmt(avgSale), icon: Receipt, color: "text-indigo-600" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white rounded-2xl border p-4 flex items-center gap-4 shadow-sm">
             <div className={`w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center ${color}`}>
@@ -208,7 +210,7 @@ export default function SalesPage() {
                   <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">{formatDateTime(sale.createdAt)}</td>
                   <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{sale.customerName || <span className="text-slate-300 text-xs">Walk-in</span>}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{sale.user?.name}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatCurrency(sale.total)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(sale.total)}</td>
                   <td className="px-4 py-3 text-center hidden md:table-cell">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${PAY_COLORS[sale.paymentMethod] || ""}`}>{sale.paymentMethod}</span>
                   </td>
@@ -265,20 +267,20 @@ export default function SalesPage() {
                       <tr key={item.id} className="border-b last:border-0">
                         <td className="px-3 py-2"><p className="font-medium text-slate-700">{item.productName}</p><p className="text-xs text-slate-400">{item.sku}</p></td>
                         <td className="px-3 py-2 text-center">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(item.unitPrice)}</td>
-                        <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.subtotal)}</td>
+                        <td className="px-3 py-2 text-right text-slate-600">{fmt(item.unitPrice)}</td>
+                        <td className="px-3 py-2 text-right font-semibold">{fmt(item.subtotal)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="space-y-1.5 text-sm border-t pt-3">
-                <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatCurrency(viewSale.subtotal)}</span></div>
-                {Number(viewSale.discount) > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-{formatCurrency(viewSale.discount)}</span></div>}
-                {Number(viewSale.tax) > 0 && <div className="flex justify-between text-slate-500"><span>Tax</span><span>{formatCurrency(viewSale.tax)}</span></div>}
-                <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span className="text-indigo-600">{formatCurrency(viewSale.total)}</span></div>
-                {viewSale.cashAmount && Number(viewSale.cashAmount) > 0 && <div className="flex justify-between text-slate-400 text-xs"><span>Cash Received</span><span>{formatCurrency(viewSale.cashAmount)}</span></div>}
-                {viewSale.change && Number(viewSale.change) > 0 && <div className="flex justify-between text-slate-400 text-xs"><span>Change</span><span>{formatCurrency(viewSale.change)}</span></div>}
+                <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{fmt(viewSale.subtotal)}</span></div>
+                {Number(viewSale.discount) > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-{fmt(viewSale.discount)}</span></div>}
+                {Number(viewSale.tax) > 0 && <div className="flex justify-between text-slate-500"><span>Tax</span><span>{fmt(viewSale.tax)}</span></div>}
+                <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span className="text-indigo-600">{fmt(viewSale.total)}</span></div>
+                {viewSale.cashAmount && Number(viewSale.cashAmount) > 0 && <div className="flex justify-between text-slate-400 text-xs"><span>Cash Received</span><span>{fmt(viewSale.cashAmount)}</span></div>}
+                {viewSale.change && Number(viewSale.change) > 0 && <div className="flex justify-between text-slate-400 text-xs"><span>Change</span><span>{fmt(viewSale.change)}</span></div>}
               </div>
             </div>
             <DialogFooter className="gap-2">

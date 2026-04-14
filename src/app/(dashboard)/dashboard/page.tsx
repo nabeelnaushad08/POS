@@ -8,52 +8,54 @@ import {
 import { TrendingUp, ShoppingCart, Package, AlertTriangle, DollarSign, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { DashboardStats } from "@/types";
 import Link from "next/link";
 
-const statCards = (stats: DashboardStats) => [
-  {
-    title: "Today's Revenue",
-    value: formatCurrency(stats.todayRevenue),
-    sub: `${stats.todayTransactions} transactions`,
-    icon: DollarSign,
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
-    trend: "+12%",
-  },
-  {
-    title: "This Week",
-    value: formatCurrency(stats.weekRevenue),
-    sub: "Weekly revenue",
-    icon: TrendingUp,
-    color: "text-blue-600",
-    bg: "bg-blue-50",
-    trend: "+8%",
-  },
-  {
-    title: "This Month",
-    value: formatCurrency(stats.monthRevenue),
-    sub: "Monthly revenue",
-    icon: ShoppingCart,
-    color: "text-purple-600",
-    bg: "bg-purple-50",
-    trend: "+15%",
-  },
-  {
-    title: "Total Products",
-    value: stats.totalProducts.toString(),
-    sub: `${stats.lowStockCount} low stock`,
-    icon: Package,
-    color: "text-indigo-600",
-    bg: "bg-indigo-50",
-    alert: stats.lowStockCount > 0,
-  },
-];
-
 export default function DashboardPage() {
+  const fmt = useCurrency();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const statCards = (stats: DashboardStats) => [
+    {
+      title: "Today's Revenue",
+      value: fmt(stats.todayRevenue),
+      sub: `${stats.todayTransactions} transactions`,
+      icon: DollarSign,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      trend: "+12%",
+    },
+    {
+      title: "This Week",
+      value: fmt(stats.weekRevenue),
+      sub: "Weekly revenue",
+      icon: TrendingUp,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      trend: "+8%",
+    },
+    {
+      title: "This Month",
+      value: fmt(stats.monthRevenue),
+      sub: "Monthly revenue",
+      icon: ShoppingCart,
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+      trend: "+15%",
+    },
+    {
+      title: "Total Products",
+      value: stats.totalProducts.toString(),
+      sub: `${stats.lowStockCount} low stock`,
+      icon: Package,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+      alert: stats.lowStockCount > 0,
+    },
+  ];
 
   useEffect(() => {
     fetch("/api/dashboard")
@@ -185,7 +187,7 @@ export default function DashboardPage() {
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
-                    formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
+                    formatter={(value) => [fmt(Number(value)), "Revenue"]}
                   />
                   <Area
                     type="monotone"
@@ -279,7 +281,7 @@ export default function DashboardPage() {
                           {formatDateTime(sale.createdAt)}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                          {formatCurrency(Number(sale.total))}
+                          {fmt(Number(sale.total))}
                         </td>
                         <td className="px-5 py-3 text-right">
                           <Badge

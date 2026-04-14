@@ -2,7 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/lib/settings-context";
 import type { CartItem } from "@/types";
 
 interface CartProps {
@@ -26,6 +26,7 @@ export function Cart({
   discount,
   tax,
 }: CartProps) {
+  const fmt = useCurrency();
   const total = subtotal - discount + tax;
 
   return (
@@ -75,7 +76,7 @@ export function Cart({
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-800 truncate">{item.name}</p>
-                  <p className="text-xs text-slate-500">{formatCurrency(item.price)} × {item.quantity}</p>
+                  <p className="text-xs text-slate-500">{fmt(item.price)} × {item.quantity}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -97,7 +98,7 @@ export function Cart({
                 </div>
                 <div className="text-right min-w-[60px]">
                   <p className="text-sm font-bold text-indigo-600">
-                    {formatCurrency(item.price * item.quantity)}
+                    {fmt(item.price * item.quantity)}
                   </p>
                   <button
                     onClick={() => onRemoveItem(item.productId)}
@@ -117,23 +118,23 @@ export function Cart({
         <div className="border-t p-4 space-y-2">
           <div className="flex justify-between text-sm text-slate-600">
             <span>Subtotal</span>
-            <span>{formatCurrency(subtotal)}</span>
+            <span>{fmt(subtotal)}</span>
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-sm text-green-600">
               <span>Discount</span>
-              <span>-{formatCurrency(discount)}</span>
+              <span>-{fmt(discount)}</span>
             </div>
           )}
           {tax > 0 && (
             <div className="flex justify-between text-sm text-slate-600">
               <span>Tax</span>
-              <span>{formatCurrency(tax)}</span>
+              <span>{fmt(tax)}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-base pt-2 border-t">
             <span>Total</span>
-            <span className="text-indigo-600 text-lg">{formatCurrency(total)}</span>
+            <span className="text-indigo-600 text-lg">{fmt(total)}</span>
           </div>
           <Button
             onClick={onCheckout}
