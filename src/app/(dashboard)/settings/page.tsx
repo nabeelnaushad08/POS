@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi } from "lucide-react";
+import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
 
 interface SystemSettingsData {
   systemName: string;
@@ -39,6 +39,44 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Printer auto-detection
+  const [detecting, setDetecting] = useState(false);
+  const [detectedIPs, setDetectedIPs] = useState<string[]>([]);
+  const [serverSubnet, setServerSubnet] = useState<string | null>(null);
+  const [testingPrinter, setTestingPrinter] = useState(false);
+  const [testResult, setTestResult] = useState<"online" | "offline" | null>(null);
+
+  const detectPrinter = async () => {
+    setDetecting(true);
+    setDetectedIPs([]);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/print/detect");
+      const data = await res.json();
+      setServerSubnet(data.primarySubnet || null);
+      if (data.detectedPrinters?.length > 0) {
+        setDetectedIPs(data.detectedPrinters);
+        // Auto-fill the first found printer IP
+        setSettings((prev) => ({ ...prev, printerIp: data.detectedPrinters[0] }));
+      } else if (data.primarySubnet) {
+        setServerSubnet(data.primarySubnet);
+      }
+    } catch { /* ignore */ }
+    finally { setDetecting(false); }
+  };
+
+  const testPrinterConnection = async () => {
+    if (!settings.printerIp) return;
+    setTestingPrinter(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/print/status");
+      const data = await res.json();
+      setTestResult(data.status === "online" ? "online" : "offline");
+    } catch { setTestResult("offline"); }
+    finally { setTestingPrinter(false); }
+  };
 
   useEffect(() => {
     fetch("/api/settings")
@@ -416,17 +454,20 @@ export default function SettingsPage() {
 
       {/* Printer Network */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
-            <Wifi className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">Network Printer (Wi-Fi / LAN)</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Epson or other thermal printers connected over the local network</p>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
+              <Wifi className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 dark:text-white">Network Printer (Wi-Fi / LAN)</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Epson or thermal printer on your local network — prints silently with no dialog</p>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Enable toggle */}
           <label className="flex items-center gap-4 cursor-pointer">
             <div className="relative">
               <input
@@ -438,36 +479,91 @@ export default function SettingsPage() {
               <div className={`w-12 h-6 rounded-full transition-colors ${settings.printerEnabled ? "bg-cyan-500" : "bg-gray-300 dark:bg-gray-600"}`} />
               <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.printerEnabled ? "translate-x-6" : ""}`} />
             </div>
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              {settings.printerEnabled ? "Network printer enabled" : "Network printer disabled (using system default printer)"}
-            </span>
+            <div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {settings.printerEnabled ? "Network printer enabled — receipts print silently on every sale" : "Network printer disabled — browser print used as fallback"}
+              </span>
+            </div>
           </label>
 
           {settings.printerEnabled && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="space-y-4">
+              {/* Auto-detect */}
+              <div className="flex items-start gap-3 p-4 bg-cyan-50 dark:bg-cyan-900/10 rounded-xl border border-cyan-200 dark:border-cyan-800">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-cyan-800 dark:text-cyan-300">Auto-detect printer on this network</p>
+                  <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-0.5">
+                    Scans the local network for printers on port 9100. The printer must be on the same router as this device.
+                    {serverSubnet && <span className="font-mono ml-1">(Network: {serverSubnet}.0/24)</span>}
+                  </p>
+                  {detectedIPs.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {detectedIPs.map((ip) => (
+                        <button
+                          key={ip}
+                          type="button"
+                          onClick={() => setSettings((prev) => ({ ...prev, printerIp: ip }))}
+                          className={`px-3 py-1 rounded-lg text-xs font-mono font-medium border transition-all ${
+                            settings.printerIp === ip
+                              ? "bg-cyan-600 text-white border-cyan-600"
+                              : "bg-white dark:bg-gray-700 text-cyan-700 dark:text-cyan-300 border-cyan-300 hover:border-cyan-500"
+                          }`}
+                        >
+                          {ip} {settings.printerIp === ip ? "✓" : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!detecting && detectedIPs.length === 0 && serverSubnet && (
+                    <p className="text-xs text-cyan-500 mt-1">No printers auto-detected — enter IP manually below.</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={detectPrinter}
+                  disabled={detecting}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 disabled:opacity-60 shrink-0"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${detecting ? "animate-spin" : ""}`} />
+                  {detecting ? "Scanning..." : "Scan Network"}
+                </button>
+              </div>
+
+              {/* Manual IP entry */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Printer IP Address</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Printer IP Address
+                  <span className="text-xs text-gray-400 font-normal ml-2">(auto-filled from scan, or enter manually)</span>
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={settings.printerIp}
-                    onChange={(e) => setSettings((prev) => ({ ...prev, printerIp: e.target.value }))}
+                    onChange={(e) => { setSettings((prev) => ({ ...prev, printerIp: e.target.value })); setTestResult(null); }}
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent font-mono"
                     placeholder="192.168.1.100"
                   />
+                  <button
+                    type="button"
+                    onClick={testPrinterConnection}
+                    disabled={!settings.printerIp || testingPrinter}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {testingPrinter ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : testResult === "online" ? (
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    ) : testResult === "offline" ? (
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                    ) : (
+                      <Wifi className="w-4 h-4" />
+                    )}
+                    {testingPrinter ? "Testing..." : testResult === "online" ? "Connected!" : testResult === "offline" ? "Not Found" : "Test Connection"}
+                  </button>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Must be on the same network as the router. Check your router admin panel for the printer&apos;s assigned IP.
+                  Port 9100 (ESC/POS standard). After saving, the status badge in the top bar will reflect the printer state automatically.
                 </p>
-              </div>
-              <div className="flex flex-col justify-end">
-                <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg p-3 text-xs text-cyan-700 dark:text-cyan-300 space-y-1">
-                  <p className="font-medium">Setup guide:</p>
-                  <p>1. Connect printer to the same router</p>
-                  <p>2. Print a network config page from the printer</p>
-                  <p>3. Enter the IP shown on that page above</p>
-                  <p>4. Save settings — status will show in header</p>
-                </div>
               </div>
             </div>
           )}

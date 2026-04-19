@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Barcode, RefreshCw, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,6 @@ import { Cart } from "@/components/pos/cart";
 import { CheckoutModal } from "@/components/pos/checkout-modal";
 import { useCart } from "@/hooks/use-cart";
 import { useSettings } from "@/lib/settings-context";
-import { printReceipt, printKOT } from "@/lib/print-utils";
 import type { Product } from "@/types";
 import toast from "react-hot-toast";
 
@@ -21,7 +20,11 @@ export default function POSPage() {
   const [loading, setLoading] = useState(true);
   const [showCheckout, setShowCheckout] = useState(false);
   const cart = useCart();
+  // Use ref for settings so handleCheckout always gets fresh values
+  // without the POS component re-rendering every time settings change
   const settings = useSettings();
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -112,26 +115,50 @@ export default function POSPage() {
       cart.clearCart();
       setShowCheckout(false);
 
-      // Auto-print receipt
-      const printerSettings = {
-        systemName: settings.systemName,
-        currencySymbol: settings.currencySymbol,
-        paperSize: "80mm" as const,
-        footer: "Thank you for your purchase!",
-        showFooter: true,
-      };
-      printReceipt(data, printerSettings);
+      const cfg = settingsRef.current;
+      const billLabel = data.billNumber ? `Bill No. ${data.billNumber}` : data.receiptNumber;
+      const amtLabel = `${cfg.currencySymbol} ${Number(data.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
-      // Print KOT if enabled
-      if (settings.kotEnabled) {
-        setTimeout(() => printKOT(data, printerSettings), 800);
+      if (cfg.printerEnabled && cfg.printerIp) {
+        // ─── Silent ESC/POS print via server-side TCP ──────────────────
+        const printJob = fetch("/api/print", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sale: data, type: "receipt" }),
+        });
+
+        const kotJob = cfg.kotEnabled
+          ? fetch("/api/print", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sale: data, type: "kot" }),
+            })
+          : Promise.resolve();
+
+        // Fire-and-forget — don't block the success toast
+        Promise.all([printJob, kotJob]).catch((err) => {
+          console.error("Print failed:", err);
+          toast.error("Print failed — check printer connection", { duration: 4000 });
+        });
+
+        toast.success(`${billLabel} · ${amtLabel}`, { duration: 5000, icon: "🧾" });
+      } else {
+        // ─── Fallback: browser print window if no network printer ──────
+        const { printReceipt, printKOT } = await import("@/lib/print-utils");
+        const fallbackSettings = {
+          systemName: cfg.systemName,
+          currencySymbol: cfg.currencySymbol,
+          paperSize: "80mm" as const,
+          footer: "Thank you for your purchase!",
+          showFooter: true,
+        };
+        printReceipt(data, fallbackSettings);
+        if (cfg.kotEnabled) {
+          setTimeout(() => printKOT(data, fallbackSettings), 1200);
+        }
+        toast.success(`${billLabel} · ${amtLabel}`, { duration: 5000, icon: "🧾" });
       }
 
-      // Sale complete toast
-      toast.success(
-        `Bill No. ${data.billNumber ?? "—"} · ${settings.currencySymbol} ${Number(data.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-        { duration: 5000, icon: "🧾" }
-      );
       loadProducts(); // refresh stock
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to process sale";

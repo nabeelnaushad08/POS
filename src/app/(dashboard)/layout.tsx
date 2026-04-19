@@ -1,5 +1,4 @@
 import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -17,12 +16,7 @@ export default async function DashboardLayout({
 
   const role = session.user.role || "CASHIER";
 
-  // Get current path from headers
-  const headersList = await headers();
-  const pathname = headersList.get("x-invoke-path") || headersList.get("x-pathname") || "";
-  const isCashierPOS = role === "CASHIER" && (pathname === "/pos" || pathname.startsWith("/pos"));
-
-  // Get low stock count using raw query
+  // Get low stock count
   const lowStockResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
     SELECT COUNT(*) as count FROM products WHERE stock <= minimum_stock AND is_active = true
   `.catch(() => [{ count: BigInt(0) }]);
@@ -37,7 +31,7 @@ export default async function DashboardLayout({
   const systemName = settings?.systemName ?? "POS System";
   const systemLogo = settings?.logo ?? null;
 
-  // Cashier always gets the full-screen POS layout (no sidebar)
+  // Cashiers always get the full-screen POS layout (no sidebar, compact header)
   if (role === "CASHIER") {
     return (
       <SettingsProvider value={settings ?? null}>
@@ -47,8 +41,6 @@ export default async function DashboardLayout({
       </SettingsProvider>
     );
   }
-
-  void isCashierPOS; // suppress unused warning
 
   return (
     <SettingsProvider value={settings ?? null}>
