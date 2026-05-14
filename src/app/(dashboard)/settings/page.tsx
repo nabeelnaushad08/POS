@@ -52,18 +52,18 @@ export default function SettingsPage() {
     setDetectedIPs([]);
     setTestResult(null);
     try {
-      const res = await fetch("/api/print/detect");
+      const res = await fetch("http://localhost:3001/detect");
       const data = await res.json();
       setServerSubnet(data.primarySubnet || null);
       if (data.detectedPrinters?.length > 0) {
         setDetectedIPs(data.detectedPrinters);
-        // Auto-fill the first found printer IP
         setSettings((prev) => ({ ...prev, printerIp: data.detectedPrinters[0] }));
-      } else if (data.primarySubnet) {
-        setServerSubnet(data.primarySubnet);
       }
-    } catch { /* ignore */ }
-    finally { setDetecting(false); }
+    } catch {
+      setServerSubnet("agent-offline");
+    } finally {
+      setDetecting(false);
+    }
   };
 
   const testPrinterConnection = async () => {
@@ -71,11 +71,20 @@ export default function SettingsPage() {
     setTestingPrinter(true);
     setTestResult(null);
     try {
-      const res = await fetch("/api/print/status");
+      // Sync current IP to the local agent config before testing
+      await fetch("http://localhost:3001/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ printerIp: settings.printerIp }),
+      }).catch(() => {});
+      const res = await fetch("http://localhost:3001/status");
       const data = await res.json();
       setTestResult(data.status === "online" ? "online" : "offline");
-    } catch { setTestResult("offline"); }
-    finally { setTestingPrinter(false); }
+    } catch {
+      setTestResult("offline");
+    } finally {
+      setTestingPrinter(false);
+    }
   };
 
   useEffect(() => {
@@ -135,6 +144,16 @@ export default function SettingsPage() {
         setTimeout(() => setSaved(false), 3000);
         // Notify SettingsProvider to re-fetch globally (currency, theme, etc.)
         window.dispatchEvent(new CustomEvent("settings-updated"));
+        // Sync printer IP and display settings to local print agent (fire-and-forget)
+        fetch("http://localhost:3001/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            printerIp:      settings.printerIp,
+            systemName:     settings.systemName,
+            currencySymbol: settings.currencySymbol,
+          }),
+        }).catch(() => {});
         // Apply theme immediately
         if (settings.theme === "dark") {
           document.documentElement.classList.add("dark");
@@ -493,8 +512,9 @@ export default function SettingsPage() {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-cyan-800 dark:text-cyan-300">Auto-detect printer on this network</p>
                   <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-0.5">
-                    Scans the local network for printers on port 9100. The printer must be on the same router as this device.
-                    {serverSubnet && <span className="font-mono ml-1">(Network: {serverSubnet}.0/24)</span>}
+                    Scans the local network for printers on port 9100 via the Print Agent running on this device.
+                    {serverSubnet && serverSubnet !== "agent-offline" && <span className="font-mono ml-1">(Network: {serverSubnet}.0/24)</span>}
+                    {serverSubnet === "agent-offline" && <span className="text-amber-600 ml-1"> Print Agent not running — start it first (see setup instructions).</span>}
                   </p>
                   {detectedIPs.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">

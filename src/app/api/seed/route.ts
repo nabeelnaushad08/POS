@@ -2,25 +2,44 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    // Only seed if no users exist yet — safe to leave this endpoint active
-    const existingUsers = await prisma.user.count();
-    if (existingUsers > 0) {
-      return NextResponse.json({
-        success: false,
-        message: "Database already seeded. Delete all users first to re-seed.",
-        users: existingUsers,
-      });
-    }
+    const { searchParams } = new URL(req.url);
+    const force = searchParams.get("force") === "true";
 
-    // ── Users ──────────────────────────────────────────────────────────────
+    const existingUsers = await prisma.user.count();
+
     const [adminPass, managerPass, cashierPass] = await Promise.all([
       bcrypt.hash("admin123", 12),
       bcrypt.hash("manager123", 12),
       bcrypt.hash("cashier123", 12),
     ]);
 
+    const logins = [
+      { role: "Admin",   email: "admin@pos.com",   password: "admin123"   },
+      { role: "Manager", email: "manager@pos.com", password: "manager123" },
+      { role: "Cashier", email: "cashier@pos.com", password: "cashier123" },
+    ];
+
+    // ── Force-reset passwords for existing users ───────────────────────────
+    if (existingUsers > 0 && force) {
+      await Promise.all([
+        prisma.user.updateMany({ where: { email: "admin@pos.com" },   data: { password: adminPass,   isActive: true } }),
+        prisma.user.updateMany({ where: { email: "manager@pos.com" }, data: { password: managerPass, isActive: true } }),
+        prisma.user.updateMany({ where: { email: "cashier@pos.com" }, data: { password: cashierPass, isActive: true } }),
+      ]);
+      return NextResponse.json({ success: true, message: "Passwords reset successfully!", logins });
+    }
+
+    if (existingUsers > 0) {
+      return NextResponse.json({
+        success: false,
+        message: "Database already seeded. Use /api/seed?force=true to reset passwords.",
+        users: existingUsers,
+      });
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────
     await prisma.user.createMany({
       data: [
         { name: "Admin User",    email: "admin@pos.com",    password: adminPass,   role: "ADMIN",   phone: "+1234567890" },
@@ -64,11 +83,7 @@ export async function GET() {
       success: true,
       message: "Database seeded successfully!",
       created: { users: 3, categories: categoryData.length, products: 10 },
-      logins: [
-        { role: "Admin",   email: "admin@pos.com",   password: "admin123"   },
-        { role: "Manager", email: "manager@pos.com", password: "manager123" },
-        { role: "Cashier", email: "cashier@pos.com", password: "cashier123" },
-      ],
+      logins,
     });
   } catch (error) {
     console.error("Seed error:", error);

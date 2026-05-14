@@ -120,25 +120,31 @@ export default function POSPage() {
       const amtLabel = `${cfg.currencySymbol} ${Number(data.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
       if (cfg.printerEnabled && cfg.printerIp) {
-        // ─── Silent ESC/POS print via server-side TCP ──────────────────
-        const printJob = fetch("/api/print", {
+        // ─── Silent ESC/POS print via local print agent (localhost:3001) ─
+        const agentSettings = {
+          systemName:     cfg.systemName,
+          currencySymbol: cfg.currencySymbol,
+          paperWidth:     48,
+          footer:         "Thank you for your purchase!",
+        };
+        const printJob = fetch("http://localhost:3001/print", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sale: data, type: "receipt" }),
+          body: JSON.stringify({ sale: data, type: "receipt", settings: agentSettings }),
         });
 
         const kotJob = cfg.kotEnabled
-          ? fetch("/api/print", {
+          ? fetch("http://localhost:3001/print", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sale: data, type: "kot" }),
+              body: JSON.stringify({ sale: data, type: "kot", settings: agentSettings }),
             })
           : Promise.resolve();
 
         // Fire-and-forget — don't block the success toast
         Promise.all([printJob, kotJob]).catch((err) => {
           console.error("Print failed:", err);
-          toast.error("Print failed — check printer connection", { duration: 4000 });
+          toast.error("Print failed — is the Print Agent running?", { duration: 4000 });
         });
 
         toast.success(`${billLabel} · ${amtLabel}`, { duration: 5000, icon: "🧾" });

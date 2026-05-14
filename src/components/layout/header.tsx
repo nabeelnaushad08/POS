@@ -32,7 +32,7 @@ export function Header({ title, lowStockCount = 0 }: HeaderProps) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const checkPrinter = useCallback(() => {
-    fetch("/api/print/status")
+    fetch("http://localhost:3001/status")
       .then((r) => r.json())
       .then((d: { status: string; ip: string | null }) => {
         setPrinterIp(d.ip);

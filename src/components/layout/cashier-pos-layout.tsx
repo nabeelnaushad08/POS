@@ -30,7 +30,7 @@ export function CashierPOSLayout({ children, systemName, systemLogo }: CashierPO
     : "U";
 
   const checkPrinter = useCallback(() => {
-    fetch("/api/print/status")
+    fetch("http://localhost:3001/status")
       .then((r) => r.json())
       .then((d: { status: string; ip: string | null }) => {
         setPrinterIp(d.ip);
