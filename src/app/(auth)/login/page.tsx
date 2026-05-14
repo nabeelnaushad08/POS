@@ -22,7 +22,6 @@ export default function LoginPage() {
     if (!email) errs.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(email)) errs.email = "Invalid email address";
     if (!password) errs.password = "Password is required";
-    else if (password.length < 6) errs.password = "Password must be at least 6 characters";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -36,7 +35,6 @@ export default function LoginPage() {
       if (result?.error) {
         toast.error("Invalid email or password");
       } else {
-        toast.success("Welcome back!");
         router.push("/dashboard");
         router.refresh();
       }
@@ -61,8 +59,12 @@ export default function LoginPage() {
         className="w-full max-w-md relative"
       >
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="text-center mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-center mb-8"
+          >
             <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
               <Store className="h-8 w-8 text-white" />
             </div>
@@ -75,9 +77,16 @@ export default function LoginPage() {
               <Label htmlFor="email" className="text-slate-300 text-sm">Email Address</Label>
               <div className="relative mt-1.5">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input id="email" type="email" placeholder="admin@pos.com"
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
                   className="pl-10 bg-white/10 border-white/10 text-white placeholder:text-slate-500 focus-visible:ring-indigo-500"
-                  value={email} onChange={(e) => setEmail(e.target.value)} />
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  autoFocus
+                />
               </div>
               {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
             </motion.div>
@@ -86,11 +95,20 @@ export default function LoginPage() {
               <Label htmlFor="password" className="text-slate-300 text-sm">Password</Label>
               <div className="relative mt-1.5">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••"
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
                   className="pl-10 pr-10 bg-white/10 border-white/10 text-white placeholder:text-slate-500 focus-visible:ring-indigo-500"
-                  value={password} onChange={(e) => setPassword(e.target.value)} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300">
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
+                >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -98,32 +116,15 @@ export default function LoginPage() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-              <Button type="submit"
+              <Button
+                type="submit"
                 className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30"
-                loading={isLoading}>
+                loading={isLoading}
+              >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </motion.div>
           </form>
-
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-            className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
-            <p className="text-slate-400 text-xs font-medium mb-2 text-center">Demo Credentials</p>
-            <div className="space-y-1.5">
-              {[
-                { role: "Admin", email: "admin@pos.com", password: "admin123" },
-                { role: "Manager", email: "manager@pos.com", password: "manager123" },
-                { role: "Cashier", email: "cashier@pos.com", password: "cashier123" },
-              ].map((cred) => (
-                <div key={cred.role} className="flex items-center justify-between text-xs cursor-pointer"
-                  onClick={() => { setEmail(cred.email); setPassword(cred.password); }}>
-                  <span className="text-slate-400">{cred.role}:</span>
-                  <span className="text-slate-300 font-mono hover:text-white transition-colors">{cred.email}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-slate-500 text-xs text-center mt-2">Click a row to auto-fill</p>
-          </motion.div>
         </div>
       </motion.div>
     </div>

@@ -50,32 +50,37 @@ export const authConfig: NextAuthConfig = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password are required");
+          return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email as string },
+          });
 
-        if (!user || !user.isActive) {
-          throw new Error("Invalid credentials or account disabled");
+          if (!user || !user.isActive) {
+            return null;
+          }
+
+          const passwordMatch = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+
+          if (!passwordMatch) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
+        } catch (err) {
+          console.error("[auth] authorize error:", err);
+          return null;
         }
-
-        const passwordMatch = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
-
-        if (!passwordMatch) {
-          throw new Error("Invalid credentials");
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
       },
     }),
   ],
