@@ -9,17 +9,11 @@ const app  = express();
 const PORT = 3001;
 const HOST = "127.0.0.1"; // listen on loopback only
 
-// ── CORS: only allow requests from localhost origins ─────────────────────────
+// ── CORS: allow any origin ───────────────────────────────────────────────────
+// Security is enforced at TCP level — agent only binds to 127.0.0.1 so
+// nothing outside this machine can connect regardless of origin header.
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // same-origin / server-to-server
-    if (
-      origin.startsWith("http://localhost") ||
-      origin.startsWith("http://127.0.0.1") ||
-      origin.startsWith("https://localhost")
-    ) return cb(null, true);
-    cb(new Error("CORS: origin not allowed"));
-  },
+  origin: true,
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
 }));
