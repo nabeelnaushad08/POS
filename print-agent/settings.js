@@ -4,8 +4,10 @@ const path = require("path");
 const CONFIG_FILE = path.join(__dirname, "printer-config.json");
 
 const DEFAULTS = {
+  printerType: "network",
   printerIp: "",
   printerPort: 9100,
+  printerName: "",
   paperWidth: 48,
   systemName: "POS SYSTEM",
   currencySymbol: "Rs.",
@@ -25,8 +27,7 @@ function load() {
 }
 
 function save(data) {
-  const current = load();
-  const merged = { ...current, ...data };
+  const merged = { ...load(), ...data };
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), "utf-8");
   return merged;
 }

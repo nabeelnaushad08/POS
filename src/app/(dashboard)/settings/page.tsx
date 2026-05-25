@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
+import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi, RefreshCw, CheckCircle, AlertCircle, Printer } from "lucide-react";
 
 interface SystemSettingsData {
   systemName: string;
@@ -46,6 +46,10 @@ export default function SettingsPage() {
   const [serverSubnet, setServerSubnet] = useState<string | null>(null);
   const [testingPrinter, setTestingPrinter] = useState(false);
   const [testResult, setTestResult] = useState<"online" | "offline" | null>(null);
+  const [printerType, setPrinterType] = useState<"network" | "usb">("network");
+  const [usbPrinters, setUsbPrinters] = useState<Array<{ name: string; status: string }>>([]);
+  const [selectedPrinterName, setSelectedPrinterName] = useState("");
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
 
   const detectPrinter = async () => {
     setDetecting(true);
@@ -66,20 +70,72 @@ export default function SettingsPage() {
     }
   };
 
-  const testPrinterConnection = async () => {
+  const listUSBPrinters = async () => {
+    setLoadingPrinters(true);
+    setUsbPrinters([]);
+    try {
+      const res = await fetch("http://localhost:3001/printers");
+      const data = await res.json();
+      setUsbPrinters(data.printers || []);
+    } catch {
+      setUsbPrinters([]);
+    } finally {
+      setLoadingPrinters(false);
+    }
+  };
+
+  const testUSBPrint = async () => {
+    if (!selectedPrinterName) return;
+    setTestingPrinter(true);
+    setTestResult(null);
+    try {
+      await fetch("http://localhost:3001/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ printerType: "usb", printerName: selectedPrinterName }),
+      });
+      const res = await fetch("http://localhost:3001/test-print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ printerName: selectedPrinterName }),
+      });
+      setTestResult(res.ok ? "online" : "offline");
+    } catch {
+      setTestResult("offline");
+    } finally {
+      setTestingPrinter(false);
+    }
+  };
+
+  const testNetworkPrinter = async () => {
     if (!settings.printerIp) return;
     setTestingPrinter(true);
     setTestResult(null);
     try {
-      // Sync current IP to the local agent config before testing
       await fetch("http://localhost:3001/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ printerIp: settings.printerIp }),
+        body: JSON.stringify({ printerIp: settings.printerIp, printerType: "network" }),
       }).catch(() => {});
       const res = await fetch("http://localhost:3001/status");
       const data = await res.json();
       setTestResult(data.status === "online" ? "online" : "offline");
+    } catch {
+      setTestResult("offline");
+    } finally {
+      setTestingPrinter(false);
+    }
+  };
+
+  const sendTestPrint = async () => {
+    setTestingPrinter(true);
+    try {
+      const res = await fetch("http://localhost:3001/test-print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ printerIp: settings.printerIp }),
+      });
+      setTestResult(res.ok ? "online" : "offline");
     } catch {
       setTestResult("offline");
     } finally {
@@ -148,11 +204,7 @@ export default function SettingsPage() {
         fetch("http://localhost:3001/config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            printerIp:      settings.printerIp,
-            systemName:     settings.systemName,
-            currencySymbol: settings.currencySymbol,
-          }),
+          body: JSON.stringify({ printerIp: settings.printerIp, printerType, printerName: selectedPrinterName, systemName: settings.systemName, currencySymbol: settings.currencySymbol, }),
         }).catch(() => {});
         // Apply theme immediately
         if (settings.theme === "dark") {
@@ -471,7 +523,7 @@ export default function SettingsPage() {
         </label>
       </div>
 
-      {/* Printer Network */}
+      {/* Printer Setup */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -479,8 +531,8 @@ export default function SettingsPage() {
               <Wifi className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
             </div>
             <div>
-              <h2 className="font-semibold text-gray-900 dark:text-white">Network Printer (Wi-Fi / LAN)</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Epson or thermal printer on your local network — prints silently with no dialog</p>
+              <h2 className="font-semibold text-gray-900 dark:text-white">Printer Setup</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Connect via USB or Wi-Fi/LAN — prints silently with no dialog</p>
             </div>
           </div>
         </div>
@@ -489,102 +541,178 @@ export default function SettingsPage() {
           {/* Enable toggle */}
           <label className="flex items-center gap-4 cursor-pointer">
             <div className="relative">
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={settings.printerEnabled}
-                onChange={(e) => setSettings((prev) => ({ ...prev, printerEnabled: e.target.checked }))}
-              />
+              <input type="checkbox" className="sr-only" checked={settings.printerEnabled}
+                onChange={e => setSettings(prev => ({ ...prev, printerEnabled: e.target.checked }))} />
               <div className={`w-12 h-6 rounded-full transition-colors ${settings.printerEnabled ? "bg-cyan-500" : "bg-gray-300 dark:bg-gray-600"}`} />
               <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.printerEnabled ? "translate-x-6" : ""}`} />
             </div>
-            <div>
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {settings.printerEnabled ? "Network printer enabled — receipts print silently on every sale" : "Network printer disabled — browser print used as fallback"}
-              </span>
-            </div>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              {settings.printerEnabled ? "Printer enabled — receipts print silently on every sale" : "Printer disabled — no automatic printing"}
+            </span>
           </label>
 
           {settings.printerEnabled && (
-            <div className="space-y-4">
-              {/* Auto-detect */}
-              <div className="flex items-start gap-3 p-4 bg-cyan-50 dark:bg-cyan-900/10 rounded-xl border border-cyan-200 dark:border-cyan-800">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-cyan-800 dark:text-cyan-300">Auto-detect printer on this network</p>
-                  <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-0.5">
-                    Scans the local network for printers on port 9100 via the Print Agent running on this device.
-                    {serverSubnet && serverSubnet !== "agent-offline" && <span className="font-mono ml-1">(Network: {serverSubnet}.0/24)</span>}
-                    {serverSubnet === "agent-offline" && <span className="text-amber-600 ml-1"> Print Agent not running — start it first (see setup instructions).</span>}
-                  </p>
-                  {detectedIPs.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {detectedIPs.map((ip) => (
-                        <button
-                          key={ip}
-                          type="button"
-                          onClick={() => setSettings((prev) => ({ ...prev, printerIp: ip }))}
-                          className={`px-3 py-1 rounded-lg text-xs font-mono font-medium border transition-all ${
-                            settings.printerIp === ip
-                              ? "bg-cyan-600 text-white border-cyan-600"
-                              : "bg-white dark:bg-gray-700 text-cyan-700 dark:text-cyan-300 border-cyan-300 hover:border-cyan-500"
-                          }`}
-                        >
-                          {ip} {settings.printerIp === ip ? "✓" : ""}
+            <div className="space-y-5">
+              {/* Printer type tabs */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Connection Type</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {["network", "usb"].map(t => (
+                    <button key={t} type="button"
+                      onClick={() => setPrinterType(t as "network" | "usb")}
+                      className={`py-2.5 px-4 rounded-lg border-2 text-sm font-medium transition-all capitalize ${
+                        printerType === t
+                          ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300"
+                          : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300"
+                      }`}>
+                      {t === "network" ? "📶 Wi-Fi / LAN" : "🔌 USB / Local"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* USB printer section */}
+              {printerType === "usb" && (
+                <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-800 dark:text-blue-300">USB / Local Printer</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                        Lists all printers installed on this Windows PC. Select your thermal printer by name.
+                      </p>
+                    </div>
+                    <button type="button" onClick={listUSBPrinters} disabled={loadingPrinters}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 shrink-0">
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingPrinters ? "animate-spin" : ""}`} />
+                      {loadingPrinters ? "Loading..." : "List Printers"}
+                    </button>
+                  </div>
+
+                  {usbPrinters.length > 0 && (
+                    <div className="space-y-1.5">
+                      {usbPrinters.map(p => (
+                        <button key={p.name} type="button"
+                          onClick={() => setSelectedPrinterName(p.name)}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border-2 text-left transition-all ${
+                            selectedPrinterName === p.name
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                              : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-blue-300"
+                          }`}>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            p.status === "ready"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-600"
+                          }`}>{p.status}</span>
                         </button>
                       ))}
                     </div>
                   )}
-                  {!detecting && detectedIPs.length === 0 && serverSubnet && (
-                    <p className="text-xs text-cyan-500 mt-1">No printers auto-detected — enter IP manually below.</p>
+
+                  {usbPrinters.length === 0 && !loadingPrinters && (
+                    <p className="text-xs text-blue-500 dark:text-blue-400">
+                      Click &ldquo;List Printers&rdquo; to see available printers, or make sure the Print Agent is running.
+                    </p>
+                  )}
+
+                  {selectedPrinterName && (
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-200 dark:border-blue-700">
+                      <div>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">Selected:</p>
+                        <p className="text-sm font-bold text-blue-800 dark:text-blue-200">{selectedPrinterName}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={testUSBPrint} disabled={testingPrinter}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-blue-300 rounded-lg text-xs text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+                          {testingPrinter ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                          Test Print
+                        </button>
+                        <button type="button" onClick={() => setSelectedPrinterName("")}
+                          className="px-3 py-1.5 border border-red-200 rounded-lg text-xs text-red-500 hover:bg-red-50">
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {testResult && (
+                    <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${testResult === "online" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                      {testResult === "online" ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                      {testResult === "online" ? "Test print sent successfully!" : "Test print failed — check the printer"}
+                    </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={detectPrinter}
-                  disabled={detecting}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 disabled:opacity-60 shrink-0"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${detecting ? "animate-spin" : ""}`} />
-                  {detecting ? "Scanning..." : "Scan Network"}
-                </button>
-              </div>
+              )}
 
-              {/* Manual IP entry */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Printer IP Address
-                  <span className="text-xs text-gray-400 font-normal ml-2">(auto-filled from scan, or enter manually)</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={settings.printerIp}
-                    onChange={(e) => { setSettings((prev) => ({ ...prev, printerIp: e.target.value })); setTestResult(null); }}
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent font-mono"
-                    placeholder="192.168.1.100"
-                  />
-                  <button
-                    type="button"
-                    onClick={testPrinterConnection}
-                    disabled={!settings.printerIp || testingPrinter}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {testingPrinter ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : testResult === "online" ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : testResult === "offline" ? (
-                      <AlertCircle className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <Wifi className="w-4 h-4" />
-                    )}
-                    {testingPrinter ? "Testing..." : testResult === "online" ? "Connected!" : testResult === "offline" ? "Not Found" : "Test Connection"}
-                  </button>
+              {/* Network printer section */}
+              {printerType === "network" && (
+                <div className="space-y-4 p-4 bg-cyan-50 dark:bg-cyan-900/10 rounded-xl border border-cyan-200 dark:border-cyan-800">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-cyan-800 dark:text-cyan-300">Wi-Fi / LAN Printer</p>
+                      <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-0.5">
+                        Printer must be on the same network. Port 9100 (ESC/POS).
+                        {serverSubnet && serverSubnet !== "agent-offline" && (
+                          <span className="font-mono ml-1">(Network: {serverSubnet}.0/24)</span>
+                        )}
+                        {serverSubnet === "agent-offline" && (
+                          <span className="text-amber-600 ml-1">Start the Print Agent first.</span>
+                        )}
+                      </p>
+                      {detectedIPs.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {detectedIPs.map(ip => (
+                            <button key={ip} type="button"
+                              onClick={() => setSettings(prev => ({ ...prev, printerIp: ip }))}
+                              className={`px-3 py-1 rounded-lg text-xs font-mono font-medium border transition-all ${
+                                settings.printerIp === ip
+                                  ? "bg-cyan-600 text-white border-cyan-600"
+                                  : "bg-white dark:bg-gray-700 text-cyan-700 dark:text-cyan-300 border-cyan-300 hover:border-cyan-500"
+                              }`}>
+                              {ip} {settings.printerIp === ip ? "✓" : ""}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={detectPrinter} disabled={detecting}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 disabled:opacity-60 shrink-0">
+                      <RefreshCw className={`w-3.5 h-3.5 ${detecting ? "animate-spin" : ""}`} />
+                      {detecting ? "Scanning..." : "Scan Network"}
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Printer IP Address
+                    </label>
+                    <div className="flex gap-2">
+                      <input type="text" value={settings.printerIp}
+                        onChange={e => { setSettings(prev => ({ ...prev, printerIp: e.target.value })); setTestResult(null); }}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 font-mono"
+                        placeholder="192.168.1.100" />
+                      <button type="button" onClick={testNetworkPrinter} disabled={!settings.printerIp || testingPrinter}
+                        className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap">
+                        {testingPrinter ? <RefreshCw className="w-4 h-4 animate-spin" />
+                          : testResult === "online" ? <CheckCircle className="w-4 h-4 text-green-500" />
+                          : testResult === "offline" ? <AlertCircle className="w-4 h-4 text-red-500" />
+                          : <Wifi className="w-4 h-4" />}
+                        {testingPrinter ? "Testing..." : testResult === "online" ? "Connected!" : testResult === "offline" ? "Not Found" : "Test Connection"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {testResult === "online" && (
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={sendTestPrint} disabled={testingPrinter}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50">
+                        <Printer className="w-3.5 h-3.5" />
+                        Send Test Print
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  Port 9100 (ESC/POS standard). After saving, the status badge in the top bar will reflect the printer state automatically.
-                </p>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -596,15 +724,12 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <Settings className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <div>
-              <h3 className="font-medium text-gray-900 dark:text-white">Printer Settings</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Configure receipt layout, paper size, logo, and footer text</p>
+              <h3 className="font-medium text-gray-900 dark:text-white">Receipt Layout</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Configure paper size, logo, and footer text</p>
             </div>
           </div>
-          <a
-            href="/settings/printer"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            Configure Printers
+          <a href="/settings/printer" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+            Configure
           </a>
         </div>
       </div>
