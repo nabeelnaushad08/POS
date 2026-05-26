@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi, RefreshCw, CheckCircle, AlertCircle, Printer } from "lucide-react";
+import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi, RefreshCw, CheckCircle, AlertCircle, Printer, FileText } from "lucide-react";
 
 interface SystemSettingsData {
   systemName: string;
@@ -16,6 +16,11 @@ interface SystemSettingsData {
   kotEnabled: boolean;
   printerIp: string;
   printerEnabled: boolean;
+  slogan: string;
+  whatsApp: string;
+  receiptNote: string;
+  thankYouLine1: string;
+  thankYouLine2: string;
 }
 
 export default function SettingsPage() {
@@ -33,6 +38,11 @@ export default function SettingsPage() {
     kotEnabled: false,
     printerIp: "",
     printerEnabled: false,
+    slogan: "",
+    whatsApp: "",
+    receiptNote: "",
+    thankYouLine1: "THANK YOU FOR YOUR VISIT",
+    thankYouLine2: "COME AGAIN!",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -162,8 +172,21 @@ export default function SettingsPage() {
             kotEnabled: d.data.kotEnabled ?? false,
             printerIp: d.data.printerIp || "",
             printerEnabled: d.data.printerEnabled ?? false,
+            slogan: d.data.slogan || "",
+            whatsApp: d.data.whatsApp || "",
+            receiptNote: d.data.receiptNote || "",
+            thankYouLine1: d.data.thankYouLine1 || "THANK YOU FOR YOUR VISIT",
+            thankYouLine2: d.data.thankYouLine2 || "COME AGAIN!",
           });
         }
+        // Also load print agent config for printerType/printerName
+        fetch("http://localhost:3001/config")
+          .then(r => r.json())
+          .then(cfg => {
+            if (cfg.printerType) setPrinterType(cfg.printerType);
+            if (cfg.printerName) setSelectedPrinterName(cfg.printerName);
+          })
+          .catch(() => {});
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -200,11 +223,24 @@ export default function SettingsPage() {
         setTimeout(() => setSaved(false), 3000);
         // Notify SettingsProvider to re-fetch globally (currency, theme, etc.)
         window.dispatchEvent(new CustomEvent("settings-updated"));
-        // Sync printer IP and display settings to local print agent (fire-and-forget)
+        // Sync printer IP, display settings, and receipt fields to local print agent
         fetch("http://localhost:3001/config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ printerIp: settings.printerIp, printerType, printerName: selectedPrinterName, systemName: settings.systemName, currencySymbol: settings.currencySymbol, }),
+          body: JSON.stringify({
+            printerIp: settings.printerIp,
+            printerType,
+            printerName: selectedPrinterName,
+            systemName: settings.systemName,
+            currencySymbol: settings.currencySymbol,
+            address: settings.address,
+            phone: settings.phone,
+            slogan: settings.slogan,
+            whatsApp: settings.whatsApp,
+            receiptNote: settings.receiptNote,
+            thankYouLine1: settings.thankYouLine1,
+            thankYouLine2: settings.thankYouLine2,
+          }),
         }).catch(() => {});
         // Apply theme immediately
         if (settings.theme === "dark") {
@@ -509,7 +545,11 @@ export default function SettingsPage() {
               type="checkbox"
               className="sr-only"
               checked={settings.kotEnabled}
-              onChange={(e) => setSettings((prev) => ({ ...prev, kotEnabled: e.target.checked }))}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setSettings((prev) => ({ ...prev, kotEnabled: v }));
+                fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kotEnabled: v }) }).catch(() => {});
+              }}
             />
             <div className={`w-12 h-6 rounded-full transition-colors ${settings.kotEnabled ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}`} />
             <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.kotEnabled ? "translate-x-6" : ""}`} />
@@ -521,6 +561,78 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Enable for restaurants, bakeries, or any kitchen-based operation</p>
           </div>
         </label>
+      </div>
+
+      {/* Receipt Content */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+            <FileText className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Receipt Content</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Text printed on customer receipts</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Slogan</label>
+              <input
+                type="text"
+                value={settings.slogan}
+                onChange={(e) => setSettings((prev) => ({ ...prev, slogan: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g. Quality You Can Trust"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">WhatsApp Number</label>
+              <input
+                type="text"
+                value={settings.whatsApp}
+                onChange={(e) => setSettings((prev) => ({ ...prev, whatsApp: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g. +94 77 906 7747"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Receipt Note</label>
+            <input
+              type="text"
+              value={settings.receiptNote}
+              onChange={(e) => setSettings((prev) => ({ ...prev, receiptNote: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="e.g. MEDICINES NOT RETURNABLE"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Thank You Line 1</label>
+              <input
+                type="text"
+                value={settings.thankYouLine1}
+                onChange={(e) => setSettings((prev) => ({ ...prev, thankYouLine1: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="THANK YOU FOR YOUR VISIT"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Thank You Line 2</label>
+              <input
+                type="text"
+                value={settings.thankYouLine2}
+                onChange={(e) => setSettings((prev) => ({ ...prev, thankYouLine2: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="COME AGAIN!"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Printer Setup */}
@@ -542,7 +654,11 @@ export default function SettingsPage() {
           <label className="flex items-center gap-4 cursor-pointer">
             <div className="relative">
               <input type="checkbox" className="sr-only" checked={settings.printerEnabled}
-                onChange={e => setSettings(prev => ({ ...prev, printerEnabled: e.target.checked }))} />
+                onChange={e => {
+                  const v = e.target.checked;
+                  setSettings(prev => ({ ...prev, printerEnabled: v }));
+                  fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ printerEnabled: v }) }).catch(() => {});
+                }} />
               <div className={`w-12 h-6 rounded-full transition-colors ${settings.printerEnabled ? "bg-cyan-500" : "bg-gray-300 dark:bg-gray-600"}`} />
               <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.printerEnabled ? "translate-x-6" : ""}`} />
             </div>

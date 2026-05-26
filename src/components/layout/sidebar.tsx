@@ -19,6 +19,7 @@ import {
   Truck,
   ShoppingBag,
   Settings,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +35,7 @@ const navItems: NavItem[] = [
   { label: "POS", href: "/pos", icon: ShoppingCart, roles: ["ADMIN", "MANAGER", "CASHIER"] },
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["ADMIN", "MANAGER"] },
   { label: "Categories", href: "/categories", icon: Tags, roles: ["ADMIN", "MANAGER"] },
-  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "MANAGER"] },
+  { label: "Reports", href: "/reports", icon: FileText, roles: ["ADMIN", "MANAGER"] },
   { label: "Users", href: "/users", icon: Users, roles: ["ADMIN"] },
   { label: "Notifications", href: "/notifications", icon: Bell, roles: ["ADMIN", "MANAGER"] },
   { label: "Customers", href: "/customers", icon: UserRound, roles: ["ADMIN", "MANAGER", "CASHIER"] },

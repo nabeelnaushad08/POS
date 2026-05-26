@@ -17,6 +17,11 @@ const DEFAULTS = {
   kotEnabled: false,
   printerIp: null,
   printerEnabled: false,
+  slogan: "",
+  whatsApp: "",
+  receiptNote: "",
+  thankYouLine1: "THANK YOU FOR YOUR VISIT",
+  thankYouLine2: "COME AGAIN!",
 };
 
 export async function GET() {
@@ -40,7 +45,7 @@ export async function PATCH(request: NextRequest) {
     if (role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await request.json();
-    const allowed = ["systemName", "logo", "currency", "currencySymbol", "timezone", "taxRate", "theme", "address", "phone", "email", "kotEnabled", "printerIp", "printerEnabled"];
+    const allowed = ["systemName", "logo", "currency", "currencySymbol", "timezone", "taxRate", "theme", "address", "phone", "email", "kotEnabled", "printerIp", "printerEnabled", "slogan", "whatsApp", "receiptNote", "thankYouLine1", "thankYouLine2"];
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) data[key] = body[key];

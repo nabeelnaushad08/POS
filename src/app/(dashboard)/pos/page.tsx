@@ -355,7 +355,7 @@ export default function POSPage() {
         ) : (
           <>
             {/* Items list — compact scrollable */}
-            <div className="max-h-[220px] overflow-y-auto p-2 space-y-1.5 border-b shrink-0">
+            <div className="max-h-[200px] overflow-y-auto p-2 space-y-1.5 border-b shrink-0">
               <AnimatePresence initial={false}>
                 {cart.items.map(item => (
                   <motion.div
@@ -366,7 +366,7 @@ export default function POSPage() {
                     className="flex items-center gap-2 bg-slate-50 rounded-xl px-2.5 py-2 group"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-800 truncate">{item.name}</p>
+                      <p className="text-sm font-semibold text-slate-800 truncate">{item.name}</p>
                       <p className="text-xs text-slate-400">{fmt(item.price)} × {item.quantity}</p>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
@@ -404,7 +404,7 @@ export default function POSPage() {
 
               {/* Customer section */}
               <div className="px-3 py-2.5 border-b space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customer</p>
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Customer</p>
                 {selectedCustomer ? (
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
@@ -420,14 +420,14 @@ export default function POSPage() {
                     <div className="flex gap-1.5">
                       <Input
                         placeholder="Search by phone..."
-                        className="h-8 text-xs flex-1"
+                        className="h-9 text-sm flex-1"
                         value={searchPhone}
                         onChange={e => setSearchPhone(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleCustomerSearch()}
                       />
                       <Button
                         type="button" variant="outline" size="sm"
-                        className="h-8 px-2.5 text-xs"
+                        className="h-9 px-2.5 text-sm"
                         onClick={handleCustomerSearch}
                         disabled={searchPhone.length < 3 || searchLoading}
                       >
@@ -461,13 +461,13 @@ export default function POSPage() {
                 <div className="grid grid-cols-2 gap-1.5">
                   <Input
                     placeholder="Name (optional)"
-                    className="h-8 text-xs"
+                    className="h-9 text-sm"
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
                   />
                   <Input
                     placeholder="Phone (optional)"
-                    className="h-8 text-xs"
+                    className="h-9 text-sm"
                     value={customerPhone}
                     onChange={e => setCustomerPhone(e.target.value)}
                   />
@@ -476,18 +476,18 @@ export default function POSPage() {
 
               {/* Discount & Tax */}
               <div className="px-3 py-2.5 border-b">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Adjustments</p>
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2">Adjustments</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-[10px] text-slate-500">Discount</Label>
                     <Input type="number" min={0} step={0.01} placeholder="0.00"
-                      className="h-8 text-xs mt-0.5"
+                      className="h-9 text-sm mt-0.5"
                       value={discount} onChange={e => setDiscount(e.target.value)} />
                   </div>
                   <div>
                     <Label className="text-[10px] text-slate-500">Tax</Label>
                     <Input type="number" min={0} step={0.01} placeholder="0.00"
-                      className="h-8 text-xs mt-0.5"
+                      className="h-9 text-sm mt-0.5"
                       value={tax} onChange={e => setTax(e.target.value)} />
                   </div>
                 </div>
@@ -495,7 +495,7 @@ export default function POSPage() {
 
               {/* Payment Method */}
               <div className="px-3 py-2.5 border-b space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment Method</p>
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Payment Method</p>
                 <div className="grid grid-cols-3 gap-1.5">
                   {([
                     { value: "CASH" as const, label: "Cash", Icon: Banknote },
@@ -523,7 +523,7 @@ export default function POSPage() {
                     <Input
                       type="number" min={0} step={0.01}
                       placeholder={`Amount received (${fmt(total)})`}
-                      className="h-8 text-xs"
+                      className="h-9 text-sm"
                       value={cashAmount}
                       onChange={e => setCashAmount(e.target.value)}
                     />
@@ -575,13 +575,13 @@ export default function POSPage() {
                       <div>
                         <Label className="text-[10px] text-slate-500">Cash</Label>
                         <Input type="number" min={0} step={0.01} placeholder="0.00"
-                          className="h-8 text-xs mt-0.5"
+                          className="h-9 text-sm mt-0.5"
                           value={cashAmount} onChange={e => setCashAmount(e.target.value)} />
                       </div>
                       <div>
                         <Label className="text-[10px] text-slate-500">Card</Label>
                         <Input type="number" min={0} step={0.01} placeholder="0.00"
-                          className="h-8 text-xs mt-0.5"
+                          className="h-9 text-sm mt-0.5"
                           value={cardAmount} onChange={e => setCardAmount(e.target.value)} />
                       </div>
                     </div>
@@ -594,7 +594,7 @@ export default function POSPage() {
 
               {/* Notes */}
               <div className="px-3 py-2.5 border-b">
-                <Input placeholder="Notes (optional)..." className="h-8 text-xs"
+                <Input placeholder="Notes (optional)..." className="h-9 text-sm"
                   value={notes} onChange={e => setNotes(e.target.value)} />
               </div>
 

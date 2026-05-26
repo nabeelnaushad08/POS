@@ -46,83 +46,152 @@ function fmt(amount, sym) {
 
 // ── Receipt builder ──────────────────────────────────────────────────────────
 function buildReceipt(sale, config) {
-  const sym = config.currencySymbol || "Rs.";
-  const store = config.systemName || "POS SYSTEM";
-  const w = config.paperWidth || 48;
-  const f = (n) => fmt(n, sym);
+  const sym   = config.currencySymbol || "Rs.";
+  const store = config.systemName     || "POS SYSTEM";
+  const w     = config.paperWidth     || 48;
+  const f     = (n) => fmt(n, sym);
+
+  // ── helpers ──────────────────────────────────────────────────────
+  function twoCol(left, right) {
+    const l = String(left), r = String(right);
+    if (l.length + r.length + 1 > w) {
+      // wrap right to its own line right-aligned
+      return Buffer.concat([
+        Buffer.from(l.substring(0, w) + "\n", "utf-8"),
+        Buffer.from(r.padStart(w) + "\n", "utf-8"),
+      ]);
+    }
+    return Buffer.from(l + " ".repeat(w - l.length - r.length) + r + "\n", "utf-8");
+  }
 
   const p = [];
-
-  // Init + center
   p.push(CMD.INIT, CMD.ALIGN_CENTER);
 
-  // Store name — double height+width
-  p.push(CMD.SIZE_DBL_HW, CMD.BOLD_ON, txt(store, w * 2), CMD.BOLD_OFF, CMD.SIZE_NORMAL);
+  // ── Shop name (large) ─────────────────────────────────────────────
+  p.push(CMD.SIZE_DBL_HW, CMD.BOLD_ON);
+  p.push(txt(store));
+  p.push(CMD.BOLD_OFF, CMD.SIZE_NORMAL);
+
+  // Slogan (if set)
+  if (config.slogan) p.push(txt(config.slogan.substring(0, w)));
+
+  // Address, Phone/WhatsApp
   if (config.address) p.push(txt(config.address.substring(0, w)));
-  if (config.phone)   p.push(txt(config.phone.substring(0, w)));
-  p.push(CMD.FEED);
-
-  // Bill number — quad size
-  if (sale.billNumber) {
-    p.push(CMD.SIZE_QUAD, CMD.BOLD_ON, txt(`No.${sale.billNumber}`), CMD.BOLD_OFF, CMD.SIZE_NORMAL);
+  if (config.phone && config.whatsApp) {
+    p.push(txt((config.phone + "  WhatsApp: " + config.whatsApp).substring(0, w)));
+  } else if (config.phone) {
+    p.push(txt(config.phone.substring(0, w)));
+  } else if (config.whatsApp) {
+    p.push(txt(("WhatsApp: " + config.whatsApp).substring(0, w)));
   }
-  p.push(txt("RECEIPT"));
-  p.push(txt(new Date(sale.createdAt).toLocaleString("en-US", { hour12: true }).substring(0, w)));
-  p.push(txt(sale.receiptNumber, w));
 
+  p.push(divider(w));
+
+  // ── Date/Time + Invoice side by side ──────────────────────────────
+  p.push(CMD.ALIGN_LEFT);
+  const saleDate = new Date(sale.createdAt);
+  const dateStr  = saleDate.toLocaleDateString("en-GB"); // DD/MM/YYYY
+  const timeStr  = saleDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  p.push(twoCol(`Date: ${dateStr}`, sale.billNumber ? `Invoice #: ${sale.billNumber}` : `Ref: ${(sale.receiptNumber||"").slice(-6)}`));
+  p.push(twoCol(`Time: ${timeStr}`, `Staff: ${(sale.user && sale.user.name) ? sale.user.name : "-"}`));
   if (sale.customerName) {
-    p.push(CMD.FEED, CMD.ALIGN_LEFT, txt(`Customer: ${sale.customerName}`, w));
+    p.push(twoCol(`Customer: ${sale.customerName}`, ""));
+  }
+  if (sale.customerPhone) {
+    p.push(twoCol(`Phone: ${sale.customerPhone}`, ""));
   }
 
-  p.push(CMD.ALIGN_LEFT, divider(w));
+  p.push(divider(w));
 
-  // Items
-  (sale.items || []).forEach((item) => {
-    const name = (item.productName || "").substring(0, w - 10);
-    p.push(CMD.BOLD_ON, txt(name, w), CMD.BOLD_OFF);
-    const qtyPart  = `  ${item.quantity} x ${f(item.unitPrice)}`;
-    const subPart  = f(item.subtotal);
-    const space    = w - qtyPart.length - subPart.length;
-    const itemLine = qtyPart + (space > 0 ? " ".repeat(space) : " ") + subPart;
-    p.push(txt(itemLine.substring(0, w)));
+  // ── Items header ──────────────────────────────────────────────────
+  const colNo   = 3;  // "No."
+  const colAmt  = 10; // "AMOUNT" right
+  const hdrLine = "No.".padEnd(colNo + 1) + "ITEM".padEnd(w - colNo - 1 - colAmt) + "AMOUNT".padStart(colAmt);
+  p.push(CMD.BOLD_ON, Buffer.from(hdrLine.substring(0, w) + "\n", "utf-8"), CMD.BOLD_OFF);
+  p.push(divider(w));
+
+  // ── Item rows ─────────────────────────────────────────────────────
+  (sale.items || []).forEach((item, idx) => {
+    const no      = `${idx + 1}.`;
+    const name    = (item.productName || "").substring(0, w - colNo - 2);
+    const itemAmt = f(item.subtotal);
+    // Line 1: number + name + amount
+    const line1 = (no + " " + name).padEnd(w - itemAmt.length) + itemAmt;
+    p.push(CMD.BOLD_ON, Buffer.from(line1.substring(0, w) + "\n", "utf-8"), CMD.BOLD_OFF);
+    // Line 2: SKU + qty x unit price
+    if (item.sku) {
+      const detail = `  ${item.sku}   ${item.quantity} x ${f(item.unitPrice)}`;
+      p.push(Buffer.from(detail.substring(0, w) + "\n", "utf-8"));
+    } else {
+      const detail = `    ${item.quantity} x ${f(item.unitPrice)}`;
+      p.push(Buffer.from(detail.substring(0, w) + "\n", "utf-8"));
+    }
   });
 
   p.push(divider(w));
 
-  // Totals
-  const sub  = parseFloat(sale.subtotal) || 0;
-  const disc = parseFloat(sale.discount) || 0;
-  const tax  = parseFloat(sale.tax)      || 0;
-  const total= parseFloat(sale.total)    || 0;
+  // ── Totals ────────────────────────────────────────────────────────
+  const sub   = parseFloat(sale.subtotal) || 0;
+  const disc  = parseFloat(sale.discount) || 0;
+  const tax   = parseFloat(sale.tax)      || 0;
+  const total = parseFloat(sale.total)    || 0;
 
-  if (disc > 0 || tax > 0) p.push(row("Subtotal", f(sub), w));
-  if (disc > 0) p.push(row("Discount", `-${f(disc)}`, w));
-  if (tax  > 0) p.push(row("Tax",       f(tax),  w));
+  p.push(row("GROSS AMOUNT", f(sub), w));
+  if (disc > 0) p.push(row("DISCOUNT", `-${f(disc)}`, w));
+  if (tax  > 0) p.push(row("TAX",       f(tax),  w));
 
   p.push(divider(w, "="));
-  p.push(CMD.SIZE_DBL_H, CMD.BOLD_ON, row("TOTAL", f(total), w), CMD.BOLD_OFF, CMD.SIZE_NORMAL);
+  p.push(CMD.SIZE_DBL_H, CMD.BOLD_ON);
+  p.push(row("NET AMOUNT", f(total), w));
+  p.push(CMD.BOLD_OFF, CMD.SIZE_NORMAL);
   p.push(divider(w, "="));
 
-  // Payment line
-  p.push(row("Payment", sale.paymentMethod || "CASH", w));
+  // ── Payment details ───────────────────────────────────────────────
+  const method = (sale.paymentMethod || "CASH").toUpperCase();
   const cash   = parseFloat(sale.cashAmount) || 0;
-  const change = parseFloat(sale.change)     || 0;
-  if (sale.paymentMethod === "CASH" && cash > 0) {
-    p.push(row("Cash received", f(cash), w));
-    if (change > 0) p.push(row("Change", f(change), w));
+  const chg    = parseFloat(sale.change)     || 0;
+  const card   = parseFloat(sale.cardAmount) || 0;
+
+  if (method === "CASH") {
+    if (cash > 0) p.push(row("CASH TENDERED", f(cash), w));
+    if (chg  > 0) p.push(row("CASH BALANCE",  f(chg),  w));
+  } else if (method === "CARD") {
+    p.push(row("CARD PAYMENT", f(total), w));
+  } else if (method === "MIXED") {
+    if (cash > 0) p.push(row("CASH TENDERED", f(cash), w));
+    if (card > 0) p.push(row("CARD AMOUNT",   f(card), w));
+    if (chg  > 0) p.push(row("BALANCE",       f(chg),  w));
   }
 
-  // Footer
+  const itemCount = (sale.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
+  p.push(Buffer.from(`[${itemCount} Item(s)]\n`, "utf-8"));
+
+  // ── Savings banner (if discount) ──────────────────────────────────
+  if (disc > 0) {
+    p.push(CMD.FEED, CMD.ALIGN_CENTER);
+    p.push(CMD.BOLD_ON, CMD.SIZE_DBL_H);
+    p.push(txt(`** YOUR SAVING ${sym}${disc.toFixed(2)} **`));
+    p.push(CMD.BOLD_OFF, CMD.SIZE_NORMAL);
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────
   p.push(CMD.FEED, CMD.ALIGN_CENTER);
-  const footer = config.footer || "Thank you for your purchase!";
-  p.push(txt(footer.substring(0, w)));
-  p.push(CMD.FEED, CMD.FEED, CMD.FEED);
-  p.push(CMD.CUT);
-
-  // Cash drawer — skip for card payments
-  if ((sale.paymentMethod || "CASH") !== "CARD") {
-    p.push(CMD.DRAWER);
+  if (config.receiptNote) {
+    p.push(divider(w));
+    p.push(CMD.BOLD_ON, txt(config.receiptNote.substring(0, w)), CMD.BOLD_OFF);
+    p.push(divider(w));
   }
+  const ty1 = config.thankYouLine1 || "THANK YOU FOR YOUR VISIT";
+  const ty2 = config.thankYouLine2 || "COME AGAIN!";
+  p.push(CMD.BOLD_ON, txt(ty1.substring(0, w)), CMD.BOLD_OFF);
+  p.push(txt(ty2.substring(0, w)));
+  p.push(CMD.FEED);
+  // Always fixed software credit
+  p.push(txt("(Software by ZENTHOZ - 0779067747)"));
+  p.push(CMD.FEED, CMD.FEED, CMD.FEED, CMD.CUT);
+
+  // Cash drawer — skip for pure card
+  if (method !== "CARD") p.push(CMD.DRAWER);
 
   return Buffer.concat(p);
 }

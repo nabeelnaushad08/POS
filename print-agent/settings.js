@@ -13,6 +13,11 @@ const DEFAULTS = {
   currencySymbol: "Rs.",
   footer: "Thank you for your purchase!",
   timeout: 6000,
+  slogan: "",
+  whatsApp: "",
+  receiptNote: "",
+  thankYouLine1: "THANK YOU FOR YOUR VISIT",
+  thankYouLine2: "COME AGAIN!",
 };
 
 function load() {

@@ -110,13 +110,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get today's bill number (count of today's sales + 1)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayCount = await prisma.sale.count({
-      where: { createdAt: { gte: todayStart } },
+    // Monthly invoice number (resets each month)
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthCount = await prisma.sale.count({
+      where: { createdAt: { gte: monthStart } },
     });
-    const billNumber = todayCount + 1;
+    const billNumber = monthCount + 1;
 
     // Create sale in a transaction
     const sale = await prisma.$transaction(async (tx) => {

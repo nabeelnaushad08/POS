@@ -324,6 +324,11 @@ model SystemSettings {
   kotEnabled     Boolean  @default(false)
   printerIp      String?
   printerEnabled Boolean  @default(false)
+  slogan         String?
+  whatsApp       String?
+  receiptNote    String?
+  thankYouLine1  String   @default("THANK YOU FOR YOUR VISIT")
+  thankYouLine2  String   @default("COME AGAIN!")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
