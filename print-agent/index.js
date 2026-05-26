@@ -32,30 +32,44 @@ app.use(express.json({ limit: "2mb" }));
 
 // ── List system printers ──────────────────────────────────────────────────────
 function listSystemPrinters() {
-  try {
-    if (process.platform === "win32") {
-      const out = execSync(
-        'wmic printer get Name,WorkOffline /format:csv 2>nul',
-        { encoding: "utf8", timeout: 8000 }
-      );
-      return out.split("\n")
-        .filter(l => l.trim() && !l.startsWith("Node"))
-        .map(line => {
-          const parts = line.split(",");
-          const name    = (parts[1] || "").trim();
-          const offline = (parts[2] || "").trim().toUpperCase() === "TRUE";
-          return name ? { name, status: offline ? "offline" : "ready" } : null;
-        })
-        .filter(Boolean);
-    } else {
+  if (process.platform !== "win32") {
+    try {
       const out = execSync("lpstat -a 2>/dev/null || true", { encoding: "utf8", timeout: 5000 });
-      return out.split("\n")
-        .filter(l => l.trim())
-        .map(l => ({ name: l.split(" ")[0], status: "ready" }));
-    }
-  } catch {
-    return [];
+      return out.split("\n").filter(l => l.trim()).map(l => ({ name: l.split(" ")[0], status: "ready" }));
+    } catch { return []; }
   }
+
+  // Windows: try PowerShell Get-Printer first (works on Win10 + Win11)
+  try {
+    const ps = `Get-Printer | Select-Object Name,PrinterStatus | ConvertTo-Json -Compress`;
+    const out = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", ps],
+      { encoding: "utf8", timeout: 10000 });
+    const parsed = JSON.parse(out.trim());
+    const arr = Array.isArray(parsed) ? parsed : [parsed];
+    return arr
+      .filter(p => p && p.Name)
+      .map(p => ({
+        name: p.Name.trim(),
+        // PrinterStatus 0 = Idle/Ready, 3 = offline
+        status: (p.PrinterStatus === 3 || p.PrinterStatus === "Offline") ? "offline" : "ready",
+      }));
+  } catch { /* fall through to wmic */ }
+
+  // Fallback: wmic (deprecated on Win11 but still present on Win10)
+  try {
+    const out = execSync('wmic printer get Name,WorkOffline /format:csv 2>nul',
+      { encoding: "utf8", timeout: 8000 });
+    return out.split("\n")
+      .map(l => l.replace(/\r/g, "").trim())
+      .filter(l => l && !l.startsWith("Node"))
+      .map(line => {
+        const parts = line.split(",");
+        const name    = (parts[1] || "").trim();
+        const offline = (parts[2] || "").trim().toUpperCase() === "TRUE";
+        return name ? { name, status: offline ? "offline" : "ready" } : null;
+      })
+      .filter(Boolean);
+  } catch { return []; }
 }
 
 // ── Raw print to local/USB printer ────────────────────────────────────────────

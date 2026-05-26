@@ -201,23 +201,27 @@ export default function POSPage() {
         footer: "Thank you for your purchase!",
       };
 
-      if (cfg.printerEnabled) {
-        const printJob = fetch("http://localhost:3001/print", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sale: data, type: "receipt", settings: agentSettings }),
-        });
-        const kotJob = cfg.kotEnabled
-          ? fetch("http://localhost:3001/print", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sale: data, type: "kot", settings: agentSettings }),
-            })
-          : Promise.resolve();
-        Promise.all([printJob, kotJob]).catch(() => {
-          toast.error("Print failed — check Print Agent is running", { duration: 4000 });
-        });
-      }
+      // Always fire print job — agent being reachable is the source of truth
+      const printJob = fetch("http://localhost:3001/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sale: data, type: "receipt", settings: agentSettings }),
+      }).then(async r => {
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          toast.error(`Print error: ${e.error || r.status}`, { duration: 5000 });
+        }
+      }).catch(() => {
+        // Agent not running — silent, user may not have a printer
+      });
+      const kotJob = cfg.kotEnabled
+        ? fetch("http://localhost:3001/print", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sale: data, type: "kot", settings: agentSettings }),
+          }).catch(() => {})
+        : Promise.resolve();
+      Promise.all([printJob, kotJob]);
 
       cart.clearCart();
       resetCheckout();
