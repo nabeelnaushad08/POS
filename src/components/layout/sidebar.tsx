@@ -21,6 +21,7 @@ import {
   Settings,
   FileText,
   Barcode,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["ADMIN", "MANAGER"] },
   { label: "Barcodes", href: "/barcodes", icon: Barcode, roles: ["ADMIN", "MANAGER"] },
   { label: "Categories", href: "/categories", icon: Tags, roles: ["ADMIN", "MANAGER"] },
+  { label: "Finance", href: "/finance", icon: DollarSign, roles: ["ADMIN", "MANAGER"] },
   { label: "Reports", href: "/reports", icon: FileText, roles: ["ADMIN", "MANAGER"] },
   { label: "Users", href: "/users", icon: Users, roles: ["ADMIN"] },
   { label: "Notifications", href: "/notifications", icon: Bell, roles: ["ADMIN", "MANAGER"] },
