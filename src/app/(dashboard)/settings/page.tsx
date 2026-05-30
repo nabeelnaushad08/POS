@@ -235,6 +235,7 @@ export default function SettingsPage() {
             currencySymbol: settings.currencySymbol,
             address: settings.address,
             phone: settings.phone,
+            logo: settings.logo || null,
             slogan: settings.slogan,
             whatsApp: settings.whatsApp,
             receiptNote: settings.receiptNote,

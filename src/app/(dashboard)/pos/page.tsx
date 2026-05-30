@@ -376,7 +376,17 @@ export default function POSPage() {
                       >
                         <Minus className="h-2.5 w-2.5 text-slate-600" />
                       </button>
-                      <span className="w-6 text-center text-xs font-bold text-slate-800">{item.quantity}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={item.stock}
+                        value={item.quantity}
+                        onChange={e => {
+                          const v = parseInt(e.target.value);
+                          if (!isNaN(v) && v >= 1 && v <= item.stock) cart.updateQuantity(item.productId, v);
+                        }}
+                        className="w-9 text-center text-xs font-bold text-slate-800 border rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 h-5 px-0"
+                      />
                       <button
                         onClick={() => cart.updateQuantity(item.productId, item.quantity + 1)}
                         disabled={item.quantity >= item.stock}

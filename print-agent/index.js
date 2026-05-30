@@ -162,7 +162,7 @@ app.post("/print", async (req, res) => {
   if (!sale) return res.status(400).json({ error: "Missing sale data" });
 
   const printConfig = { ...cfg, ...bodySettings, paperWidth: bodySettings.paperWidth || cfg.paperWidth || 48 };
-  const data = type === "kot" ? buildKOT(sale, printConfig) : buildReceipt(sale, printConfig);
+  const data = await (type === "kot" ? buildKOT(sale, printConfig) : buildReceipt(sale, printConfig));
 
   // USB / local printer
   if (cfg.printerType === "usb" && cfg.printerName) {

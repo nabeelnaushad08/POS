@@ -1,4 +1,45 @@
-const net = require("net");
+const net  = require("net");
+const Jimp = require("jimp");
+
+// ── ESC/POS bitmap logo ───────────────────────────────────────────────────────
+async function buildLogoBytes(base64Image, maxWidth) {
+  try {
+    // Strip data URI prefix if present
+    const raw = base64Image.replace(/^data:image\/[^;]+;base64,/, "");
+    const buf = Buffer.from(raw, "base64");
+    const img = await Jimp.read(buf);
+
+    // Scale to fit thermal paper width (max ~256px for 58mm, ~384px for 80mm)
+    const targetW = Math.min(maxWidth || 256, img.bitmap.width);
+    img.resize(targetW, Jimp.AUTO).greyscale().contrast(0.3);
+
+    const w = img.bitmap.width;
+    const h = img.bitmap.height;
+
+    // Convert to 1-bit bitmap row by row (threshold 127)
+    const bytesPerRow = Math.ceil(w / 8);
+    const rows = [];
+    for (let y = 0; y < h; y++) {
+      const row = Buffer.alloc(bytesPerRow, 0);
+      for (let x = 0; x < w; x++) {
+        const { r, g, b } = Jimp.intToRGBA(img.getPixelColor(x, y));
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (luma < 127) row[Math.floor(x / 8)] |= (0x80 >> (x % 8));
+      }
+      rows.push(row);
+    }
+
+    // ESC/POS: GS v 0 — print raster bit image
+    const header = Buffer.from([
+      0x1d, 0x76, 0x30, 0x00,          // GS v 0 normal
+      bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,  // xL xH
+      h & 0xff, (h >> 8) & 0xff,        // yL yH
+    ]);
+    return Buffer.concat([header, ...rows]);
+  } catch {
+    return null;
+  }
+}
 
 // ── ESC/POS byte constants ───────────────────────────────────────────────────
 const ESC = 0x1b;
@@ -45,7 +86,7 @@ function fmt(amount, sym) {
 }
 
 // ── Receipt builder ──────────────────────────────────────────────────────────
-function buildReceipt(sale, config) {
+async function buildReceipt(sale, config) {
   const sym   = config.currencySymbol || "Rs.";
   const store = config.systemName     || "POS SYSTEM";
   const w     = config.paperWidth     || 48;
@@ -65,7 +106,19 @@ function buildReceipt(sale, config) {
   }
 
   const p = [];
-  p.push(CMD.INIT, CMD.ALIGN_CENTER);
+  p.push(CMD.INIT);
+
+  // ── Cash drawer FIRST (opens as soon as printer receives the job) ──
+  const method = (sale.paymentMethod || "CASH").toUpperCase();
+  if (method !== "CARD") p.push(CMD.DRAWER);
+
+  p.push(CMD.ALIGN_CENTER);
+
+  // ── Logo (if saved in config) ─────────────────────────────────────
+  if (config.logo) {
+    const logoBytes = await buildLogoBytes(config.logo, config.paperWidth ? config.paperWidth * 5 : 256);
+    if (logoBytes) { p.push(logoBytes); p.push(CMD.FEED); }
+  }
 
   // ── Shop name (large) ─────────────────────────────────────────────
   p.push(CMD.SIZE_DBL_HW, CMD.BOLD_ON);
@@ -147,7 +200,6 @@ function buildReceipt(sale, config) {
   p.push(divider(w, "="));
 
   // ── Payment details ───────────────────────────────────────────────
-  const method = (sale.paymentMethod || "CASH").toUpperCase();
   const cash   = parseFloat(sale.cashAmount) || 0;
   const chg    = parseFloat(sale.change)     || 0;
   const card   = parseFloat(sale.cardAmount) || 0;
@@ -189,9 +241,6 @@ function buildReceipt(sale, config) {
   // Always fixed software credit
   p.push(txt("(Software by ZENTHOZ - 0779067747)"));
   p.push(CMD.FEED, CMD.FEED, CMD.FEED, CMD.CUT);
-
-  // Cash drawer — skip for pure card
-  if (method !== "CARD") p.push(CMD.DRAWER);
 
   return Buffer.concat(p);
 }
