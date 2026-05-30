@@ -1,15 +1,17 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   FileText, Download, RefreshCw, TrendingUp, ShoppingCart,
-  DollarSign, Package, BarChart2,
+  DollarSign, Package, BarChart2, ArrowRight,
 } from "lucide-react";
 import { useCurrency } from "@/lib/settings-context";
 
 type ReportType =
   | "sales" | "sales-cashier" | "sales-product" | "sales-category"
   | "stock-current" | "stock-low" | "stock-out" | "stock-valuation"
-  | "profit-gross" | "profit-net" | "profit-product" | "discounts";
+  | "profit-gross" | "profit-net" | "profit-product" | "discounts"
+  | "fin-pl" | "fin-cashflow" | "fin-expense" | "fin-investment" | "fin-asset";
 
 interface ReportData {
   type: string;
@@ -69,36 +71,48 @@ const REPORT_GROUPS = [
     label: "Sales Reports",
     icon: ShoppingCart,
     reports: [
-      { type: "sales",          label: "Sales Overview" },
-      { type: "sales-cashier",  label: "Sales by Cashier" },
-      { type: "sales-product",  label: "Sales by Product" },
-      { type: "sales-category", label: "Sales by Category" },
-      { type: "discounts",      label: "Discount Report" },
+      { type: "sales",          label: "Sales Overview",      href: undefined },
+      { type: "sales-cashier",  label: "Sales by Cashier",    href: undefined },
+      { type: "sales-product",  label: "Sales by Product",    href: undefined },
+      { type: "sales-category", label: "Sales by Category",   href: undefined },
+      { type: "discounts",      label: "Discount Report",     href: undefined },
     ],
   },
   {
     label: "Inventory Reports",
     icon: Package,
     reports: [
-      { type: "stock-current",   label: "Current Stock" },
-      { type: "stock-low",       label: "Low Stock" },
-      { type: "stock-out",       label: "Out of Stock" },
-      { type: "stock-valuation", label: "Stock Valuation" },
+      { type: "stock-current",   label: "Current Stock",   href: undefined },
+      { type: "stock-low",       label: "Low Stock",       href: undefined },
+      { type: "stock-out",       label: "Out of Stock",    href: undefined },
+      { type: "stock-valuation", label: "Stock Valuation", href: undefined },
     ],
   },
   {
     label: "Profit Reports",
     icon: TrendingUp,
     reports: [
-      { type: "profit-gross",   label: "Gross Profit" },
-      { type: "profit-net",     label: "Net Profit" },
-      { type: "profit-product", label: "Product Profitability" },
+      { type: "profit-gross",   label: "Gross Profit",         href: undefined },
+      { type: "profit-net",     label: "Net Profit",           href: undefined },
+      { type: "profit-product", label: "Product Profitability", href: undefined },
     ],
   },
-] as const;
+  {
+    label: "Financial Reports",
+    icon: DollarSign,
+    reports: [
+      { type: "fin-pl",         label: "Profit & Loss",    href: "/finance/reports?type=pl" },
+      { type: "fin-cashflow",   label: "Cash Flow",        href: "/finance/reports?type=cashflow" },
+      { type: "fin-expense",    label: "Expense Report",   href: "/finance/reports?type=expense" },
+      { type: "fin-investment", label: "Investment Report", href: "/finance/reports?type=investment" },
+      { type: "fin-asset",      label: "Asset Register",   href: "/finance/reports?type=asset" },
+    ],
+  },
+];
 
 export default function ReportsPage() {
   const fmt = useCurrency();
+  const router = useRouter();
   const today      = new Date().toISOString().split("T")[0];
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
 
@@ -164,6 +178,18 @@ export default function ReportsPage() {
 
   return (
     <div className="p-4 lg:p-6">
+      {/* Financial Dashboard Banner */}
+      <div
+        className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 text-white flex items-center justify-between mb-4 print:hidden cursor-pointer hover:from-indigo-700 hover:to-purple-700 transition-all"
+        onClick={() => router.push("/finance")}
+      >
+        <div>
+          <p className="font-bold">Owner Financial Dashboard</p>
+          <p className="text-indigo-200 text-xs mt-0.5">Complete financial overview, P&amp;L, cash flow, assets &amp; more</p>
+        </div>
+        <ArrowRight className="w-5 h-5" />
+      </div>
+
       {/* Page header */}
       <div className="flex items-center justify-between mb-6 print:hidden">
         <div>
@@ -201,7 +227,10 @@ export default function ReportsPage() {
               {group.reports.map(r => (
                 <button
                   key={r.type}
-                  onClick={() => { setActiveReport(r.type as ReportType); setReport(null); }}
+                  onClick={() => {
+                    if (r.href) { router.push(r.href); return; }
+                    setActiveReport(r.type as ReportType); setReport(null);
+                  }}
                   className={`w-full text-left px-3 py-2.5 text-sm transition-colors border-b last:border-0 dark:border-gray-700 ${
                     activeReport === r.type
                       ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium"

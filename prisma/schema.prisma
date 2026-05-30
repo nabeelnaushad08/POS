@@ -426,3 +426,74 @@ model PerformanceNote {
   @@index([employeeId])
   @@map("performance_notes")
 }
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  color     String    @default("#6366f1")
+  isDefault Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  expenses  Expense[]
+  @@map("expense_categories")
+}
+
+model Expense {
+  id            String           @id @default(cuid())
+  title         String
+  amount        Decimal          @db.Decimal(10, 2)
+  categoryId    String?
+  date          DateTime         @default(now())
+  paymentMethod String           @default("CASH")
+  reference     String?
+  notes         String?
+  receipt       String?          @db.LongText
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  category      ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  @@index([date])
+  @@index([categoryId])
+  @@map("expenses")
+}
+
+model Investment {
+  id          String   @id @default(cuid())
+  title       String
+  type        String   @default("INITIAL")
+  amount      Decimal  @db.Decimal(10, 2)
+  date        DateTime @default(now())
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([date])
+  @@map("investments")
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  name         String
+  type         String   @default("EQUIPMENT")
+  purchaseCost Decimal  @db.Decimal(10, 2)
+  currentValue Decimal  @db.Decimal(10, 2)
+  purchaseDate DateTime
+  notes        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([isActive])
+  @@map("assets")
+}
+
+model CustomerCredit {
+  id           String   @id @default(cuid())
+  customerId   String?
+  customerName String?
+  type         String   @default("CREDIT")
+  amount       Decimal  @db.Decimal(10, 2)
+  saleId       String?
+  notes        String?
+  date         DateTime @default(now())
+  createdAt    DateTime @default(now())
+  @@index([customerId])
+  @@index([date])
+  @@map("customer_credits")
+}
