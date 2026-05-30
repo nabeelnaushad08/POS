@@ -44,6 +44,7 @@ const navItems: NavItem[] = [
   { label: "Sales", href: "/sales", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
   { label: "Suppliers", href: "/suppliers", icon: Truck, roles: ["ADMIN", "MANAGER"] },
   { label: "Purchases", href: "/purchases", icon: ShoppingBag, roles: ["ADMIN", "MANAGER"] },
+  { label: "Employees", href: "/employees", icon: Users, roles: ["ADMIN", "MANAGER"] },
   { label: "Settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
 ];
 
