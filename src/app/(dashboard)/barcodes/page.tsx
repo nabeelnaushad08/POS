@@ -39,6 +39,8 @@ export default function BarcodesPage() {
   useEffect(() => {
     if (loading) return;
     // Dynamically import bwip-js to keep it client-side only
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     import("bwip-js").then((mod) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bwipjs: any = mod.default || mod;
