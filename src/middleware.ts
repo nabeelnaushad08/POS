@@ -4,6 +4,24 @@ import type { NextRequest } from "next/server";
 
 export default auth(function middleware(req) {
   const { nextUrl } = req;
+
+  // License check via cookie (must be before auth checks)
+  const licensed = req.cookies.get("pos-licensed")?.value;
+  const isSetupRoute = nextUrl.pathname.startsWith("/setup");
+  const isApiSetup = nextUrl.pathname.startsWith("/api/setup");
+  const isAuthRoute = nextUrl.pathname.startsWith("/api/auth");
+  const isNextInternal = nextUrl.pathname.startsWith("/_next");
+  const isPublicFile = ["/favicon.ico"].includes(nextUrl.pathname);
+
+  if (!licensed && !isSetupRoute && !isApiSetup && !isAuthRoute && !isNextInternal && !isPublicFile) {
+    return NextResponse.redirect(new URL("/setup", req.url));
+  }
+
+  // If this is a setup route, allow through without auth checks
+  if (isSetupRoute || isApiSetup) {
+    return NextResponse.next();
+  }
+
   const isLoggedIn = !!req.auth;
   const isAuthPage = nextUrl.pathname.startsWith("/login");
   const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");

@@ -327,10 +327,13 @@ model SystemSettings {
   slogan         String?
   whatsApp       String?
   receiptNote    String?
-  thankYouLine1  String   @default("THANK YOU FOR YOUR VISIT")
-  thankYouLine2  String   @default("COME AGAIN!")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  thankYouLine1       String    @default("THANK YOU FOR YOUR VISIT")
+  thankYouLine2       String    @default("COME AGAIN!")
+  licenseKey          String?
+  licenseActivatedAt  DateTime?
+  licenseType         String    @default("TRIAL")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@map("system_settings")
 }

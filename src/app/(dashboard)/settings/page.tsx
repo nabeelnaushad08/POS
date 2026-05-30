@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi, RefreshCw, CheckCircle, AlertCircle, Printer, FileText } from "lucide-react";
+import { Settings, Store, Palette, DollarSign, MapPin, Phone, Mail, Save, Upload, X, UtensilsCrossed, Wifi, RefreshCw, CheckCircle, AlertCircle, Printer, FileText, Shield, Database } from "lucide-react";
 
 interface SystemSettingsData {
   systemName: string;
@@ -21,6 +21,9 @@ interface SystemSettingsData {
   receiptNote: string;
   thankYouLine1: string;
   thankYouLine2: string;
+  licenseKey?: string | null;
+  licenseActivatedAt?: string | null;
+  licenseType?: string;
 }
 
 export default function SettingsPage() {
@@ -43,12 +46,23 @@ export default function SettingsPage() {
     receiptNote: "",
     thankYouLine1: "THANK YOU FOR YOUR VISIT",
     thankYouLine2: "COME AGAIN!",
+    licenseKey: null,
+    licenseActivatedAt: null,
+    licenseType: "TRIAL",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // License & DB state
+  const [dbStatus, setDbStatus] = useState<"idle" | "testing" | "connected" | "error">("idle");
+  const [showReactivate, setShowReactivate] = useState(false);
+  const [reactivateKey, setReactivateKey] = useState("");
+  const [reactivating, setReactivating] = useState(false);
+  const [reactivateError, setReactivateError] = useState("");
+  const [reactivateSuccess, setReactivateSuccess] = useState(false);
 
   // Printer auto-detection
   const [detecting, setDetecting] = useState(false);
@@ -177,6 +191,9 @@ export default function SettingsPage() {
             receiptNote: d.data.receiptNote || "",
             thankYouLine1: d.data.thankYouLine1 || "THANK YOU FOR YOUR VISIT",
             thankYouLine2: d.data.thankYouLine2 || "COME AGAIN!",
+            licenseKey: d.data.licenseKey || null,
+            licenseActivatedAt: d.data.licenseActivatedAt || null,
+            licenseType: d.data.licenseType || "TRIAL",
           });
         }
         // Also load print agent config for printerType/printerName
@@ -848,6 +865,149 @@ export default function SettingsPage() {
           <a href="/settings/printer" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
             Configure
           </a>
+        </div>
+      </div>
+
+      {/* License & Database */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+            <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">License &amp; Database</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">License activation status and database connectivity</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* License Status Card */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-3">
+              <Shield className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">License Status</p>
+                {settings.licenseKey && settings.licenseType === "ACTIVATED" ? (
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <CheckCircle className="w-3 h-3 mr-1" /> Activated
+                    </span>
+                    {settings.licenseActivatedAt && (
+                      <span className="text-xs text-gray-400">
+                        on {new Date(settings.licenseActivatedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 mt-0.5">
+                    Trial Mode
+                  </span>
+                )}
+                {settings.licenseKey && (
+                  <p className="text-xs text-gray-400 font-mono mt-1">{settings.licenseKey}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => { setShowReactivate(!showReactivate); setReactivateError(""); setReactivateSuccess(false); }}
+              className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              {showReactivate ? "Cancel" : "Re-activate"}
+            </button>
+          </div>
+
+          {/* Re-activate Form */}
+          {showReactivate && (
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800 rounded-lg space-y-3">
+              <p className="text-sm font-medium text-indigo-800 dark:text-indigo-300">Enter new license key</p>
+              <input
+                type="text"
+                value={reactivateKey}
+                onChange={(e) => { setReactivateKey(e.target.value.toUpperCase()); setReactivateError(""); }}
+                placeholder="ZPOS-XXXX-XXXX-XXXX-XXXX"
+                className="w-full px-3 py-2 border border-indigo-300 dark:border-indigo-700 rounded-lg text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+              {reactivateError && (
+                <p className="text-xs text-red-600 dark:text-red-400">{reactivateError}</p>
+              )}
+              {reactivateSuccess && (
+                <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <CheckCircle className="w-3.5 h-3.5" /> License reactivated successfully!
+                </p>
+              )}
+              <button
+                onClick={async () => {
+                  if (!reactivateKey.trim()) { setReactivateError("Please enter a license key"); return; }
+                  setReactivating(true);
+                  setReactivateError("");
+                  try {
+                    const res = await fetch("/api/setup/activate", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ key: reactivateKey }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data.success) {
+                      setReactivateError(data.error || "Invalid license key");
+                    } else {
+                      setReactivateSuccess(true);
+                      document.cookie = "pos-licensed=true; path=/; max-age=31536000";
+                      setSettings(prev => ({ ...prev, licenseKey: reactivateKey, licenseType: "ACTIVATED", licenseActivatedAt: new Date().toISOString() }));
+                      setTimeout(() => setShowReactivate(false), 2000);
+                    }
+                  } catch {
+                    setReactivateError("Failed to activate. Please try again.");
+                  } finally {
+                    setReactivating(false);
+                  }
+                }}
+                disabled={reactivating || !reactivateKey.trim()}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+              >
+                {reactivating ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Activating...</> : "Activate"}
+              </button>
+            </div>
+          )}
+
+          {/* Database Status Card */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-3">
+              <Database className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Database Status</p>
+                {dbStatus === "connected" && (
+                  <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400 mt-0.5">
+                    <CheckCircle className="w-3 h-3 mr-1" /> Connected
+                  </span>
+                )}
+                {dbStatus === "error" && (
+                  <span className="inline-flex items-center text-xs text-red-600 dark:text-red-400 mt-0.5">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Connection failed
+                  </span>
+                )}
+                {(dbStatus === "idle" || dbStatus === "testing") && (
+                  <span className="text-xs text-gray-400 mt-0.5 block">Click &quot;Test Connection&quot; to check</span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                setDbStatus("testing");
+                try {
+                  const res = await fetch("/api/setup/db-status");
+                  const data = await res.json();
+                  setDbStatus(data.connected ? "connected" : "error");
+                } catch {
+                  setDbStatus("error");
+                }
+              }}
+              disabled={dbStatus === "testing"}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${dbStatus === "testing" ? "animate-spin" : ""}`} />
+              {dbStatus === "testing" ? "Testing..." : "Test Connection"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

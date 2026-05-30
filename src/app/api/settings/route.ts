@@ -22,6 +22,10 @@ const DEFAULTS = {
   receiptNote: "",
   thankYouLine1: "THANK YOU FOR YOUR VISIT",
   thankYouLine2: "COME AGAIN!",
+  // License fields (read-only via this API — activation via /api/setup/activate)
+  licenseKey: null,
+  licenseActivatedAt: null,
+  licenseType: "TRIAL",
 };
 
 export async function GET() {
