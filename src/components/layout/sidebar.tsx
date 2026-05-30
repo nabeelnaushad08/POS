@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   Settings,
   FileText,
+  Barcode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "CASHIER"] },
   { label: "POS", href: "/pos", icon: ShoppingCart, roles: ["ADMIN", "MANAGER", "CASHIER"] },
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["ADMIN", "MANAGER"] },
+  { label: "Barcodes", href: "/barcodes", icon: Barcode, roles: ["ADMIN", "MANAGER"] },
   { label: "Categories", href: "/categories", icon: Tags, roles: ["ADMIN", "MANAGER"] },
   { label: "Reports", href: "/reports", icon: FileText, roles: ["ADMIN", "MANAGER"] },
   { label: "Users", href: "/users", icon: Users, roles: ["ADMIN"] },

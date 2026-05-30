@@ -5,6 +5,7 @@ import {
   Search, Barcode, RefreshCw, Tag, ShoppingCart, Minus, Plus, Trash2,
   Banknote, CreditCard, Blend, X, CheckCircle, Printer,
 } from "lucide-react";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -53,6 +54,14 @@ export default function POSPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerResult | null>(null);
+
+  // Barcode scanner state
+  const [scannerEnabled, setScannerEnabled] = useState(true);
+  const [scanSound, setScanSound] = useState(true);
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const barcodeBufferRef = useRef("");
+  const barcodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Change overlay
   const [changeOverlay, setChangeOverlay] = useState<{
@@ -105,6 +114,59 @@ export default function POSPage() {
     });
     toast.success(`${product.name} added`, { duration: 1000 });
   };
+
+  const handleBarcodeInput = useCallback(async (barcode: string) => {
+    if (!barcode.trim()) return;
+    try {
+      const res = await fetch(`/api/products?search=${encodeURIComponent(barcode.trim())}&limit=1&active=true`);
+      const data = await res.json();
+      const product = data.data?.[0];
+      if (!product) {
+        toast.error(`Barcode not found: ${barcode}`, { duration: 2000 });
+        return;
+      }
+      // Check if barcode or SKU matches exactly
+      const exactMatch = product.barcode === barcode.trim() || product.sku === barcode.trim();
+      if (!exactMatch && product.name.toLowerCase() !== barcode.trim().toLowerCase()) {
+        toast.error(`No product for: ${barcode}`, { duration: 2000 });
+        return;
+      }
+      handleAddToCart(product);
+      setLastScanned(product.name);
+      setTimeout(() => setLastScanned(null), 2000);
+      if (scanSound) {
+        // Play a short beep using Web Audio API
+        try {
+          const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+          osc.start(); osc.stop(ctx.currentTime + 0.15);
+        } catch {}
+      }
+    } catch {
+      toast.error("Scanner error", { duration: 2000 });
+    }
+  }, [handleAddToCart, scanSound]);
+
+  useEffect(() => {
+    if (!scannerEnabled) return;
+    const onKey = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement;
+      const isInput = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable);
+      // Only redirect if the focused element is NOT one of our regular form inputs
+      if (isInput && active !== barcodeInputRef.current) return;
+      if (e.key === "F1" || e.key === "F2" || e.key === "Escape") return;
+      if (barcodeInputRef.current && active !== barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [scannerEnabled]);
 
   const handleCustomerSearch = async () => {
     if (searchPhone.length < 3) return;
@@ -239,7 +301,36 @@ export default function POSPage() {
       <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
         {/* Search & Filters */}
         <div className="p-3 bg-white border-b space-y-2 shrink-0">
-          <div className="flex gap-2">
+          {/* Hidden barcode scanner capture input */}
+          {scannerEnabled && (
+            <input
+              ref={barcodeInputRef}
+              type="text"
+              className="absolute opacity-0 w-0 h-0 pointer-events-none"
+              aria-hidden="true"
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  const val = barcodeBufferRef.current.trim();
+                  barcodeBufferRef.current = "";
+                  if (barcodeTimerRef.current) clearTimeout(barcodeTimerRef.current);
+                  if (val) handleBarcodeInput(val);
+                  e.preventDefault();
+                }
+              }}
+              onChange={e => {
+                barcodeBufferRef.current = e.target.value;
+                if (barcodeTimerRef.current) clearTimeout(barcodeTimerRef.current);
+                // Auto-submit after 120ms of no input (scanner sends chars fast)
+                barcodeTimerRef.current = setTimeout(() => {
+                  const val = barcodeBufferRef.current.trim();
+                  barcodeBufferRef.current = "";
+                  e.target.value = "";
+                  if (val.length >= 4) handleBarcodeInput(val);
+                }, 120);
+              }}
+            />
+          )}
+          <div className="flex gap-2 items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
@@ -259,7 +350,25 @@ export default function POSPage() {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
+            <button
+              onClick={() => setScannerEnabled(v => !v)}
+              title={scannerEnabled ? "Disable scanner" : "Enable scanner"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                scannerEnabled
+                  ? "bg-green-50 border-green-300 text-green-700"
+                  : "bg-slate-50 border-slate-200 text-slate-500"
+              }`}
+            >
+              <Barcode className="h-3.5 w-3.5" />
+              {scannerEnabled ? "Scanner ON" : "Scanner OFF"}
+            </button>
           </div>
+          {lastScanned && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 border border-green-300 rounded-lg text-xs font-medium text-green-700 animate-pulse">
+              <Barcode className="h-3.5 w-3.5" />
+              Scanned: {lastScanned}
+            </div>
+          )}
           <div className="flex gap-2 overflow-x-auto pb-0.5">
             <button
               onClick={() => setSelectedCategory("all")}
