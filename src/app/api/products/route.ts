@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { generateProductBarcode } from "@/lib/barcode-utils";
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -93,6 +94,19 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.product.findUnique({ where: { sku: validated.sku } });
     if (existing) {
       return NextResponse.json({ error: "SKU already exists" }, { status: 409 });
+    }
+
+    // Auto-generate barcode if not provided
+    if (!validated.barcode) {
+      const count = await prisma.product.count();
+      let candidate = generateProductBarcode(count + 1);
+      // Ensure uniqueness
+      let attempts = 0;
+      while (await prisma.product.findUnique({ where: { barcode: candidate } })) {
+        attempts++;
+        candidate = generateProductBarcode(count + 1 + attempts);
+      }
+      validated.barcode = candidate;
     }
 
     const product = await prisma.product.create({
