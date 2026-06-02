@@ -78,15 +78,31 @@ function printToLocalPrinter(printerName, data) {
   fs.writeFileSync(tmpFile, data);
   try {
     if (process.platform === "win32") {
-      // PowerShell raw print via Windows Spooler API — no driver dialog
-      const psScript = `
+      const safeName = printerName.replace(/'/g, "''");
+      const safePath = tmpFile.replace(/\\/g, "\\\\");
+
+      // Method 1: Direct USB port write via WMI (no C# compilation, fastest)
+      const psMethod1 = `
 $ErrorActionPreference = 'Stop'
-$bytes = [System.IO.File]::ReadAllBytes('${tmpFile.replace(/\\/g, "\\\\")}')
-$pName = '${printerName.replace(/'/g, "''")}'
+$bytes = [System.IO.File]::ReadAllBytes('${safePath}')
+$pName = '${safeName}'
+$printer = Get-WmiObject Win32_Printer -Filter "Name='$pName'" 2>$null
+if (-not $printer) { throw "Printer not found: $pName" }
+$portName = $printer.PortName
+$fs = New-Object System.IO.FileStream("\\\\.\\\$portName", [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
+$fs.Write($bytes, 0, $bytes.Length)
+$fs.Flush()
+$fs.Close()`;
+
+      // Method 2: Windows Spooler RAW API (reliable fallback, requires C# compilation)
+      const psMethod2 = `
+$ErrorActionPreference = 'Stop'
+$bytes = [System.IO.File]::ReadAllBytes('${safePath}')
+$pName = '${safeName}'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public class RawPrint {
+public class RawPrint2 {
     [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Auto)]
     public struct DOCINFO { public int cbSize; public string pDocName; public string pOutputFile; public string pDataType; public int fwType; }
     [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]
@@ -105,19 +121,28 @@ public class RawPrint {
     public static extern bool WritePrinter(IntPtr h, byte[] b, int n, out int w);
 }
 '@
-$di = New-Object RawPrint+DOCINFO
+$di = New-Object RawPrint2+DOCINFO
 $di.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($di)
 $di.pDocName = 'POS'
 $di.pDataType = 'RAW'
 $hp = [IntPtr]::Zero
-if (-not [RawPrint]::OpenPrinter($pName, [ref]$hp, [IntPtr]::Zero)) { throw "Cannot open: $pName" }
-[RawPrint]::StartDocPrinter($hp, 1, [ref]$di) | Out-Null
-[RawPrint]::StartPagePrinter($hp) | Out-Null
-$w = 0; [RawPrint]::WritePrinter($hp, $bytes, $bytes.Length, [ref]$w) | Out-Null
-[RawPrint]::EndPagePrinter($hp) | Out-Null
-[RawPrint]::EndDocPrinter($hp) | Out-Null
-[RawPrint]::ClosePrinter($hp) | Out-Null`;
-      execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", psScript], { timeout: 20000 });
+if (-not [RawPrint2]::OpenPrinter($pName, [ref]$hp, [IntPtr]::Zero)) { throw "Cannot open: $pName" }
+[RawPrint2]::StartDocPrinter($hp, 1, [ref]$di) | Out-Null
+[RawPrint2]::StartPagePrinter($hp) | Out-Null
+$w = 0; [RawPrint2]::WritePrinter($hp, $bytes, $bytes.Length, [ref]$w) | Out-Null
+[RawPrint2]::EndPagePrinter($hp) | Out-Null
+[RawPrint2]::EndDocPrinter($hp) | Out-Null
+[RawPrint2]::ClosePrinter($hp) | Out-Null`;
+
+      const psOpts = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
+
+      // Try Method 1 first (direct port), fall back to Method 2 (spooler)
+      try {
+        execFileSync("powershell", [...psOpts, psMethod1], { timeout: 10000 });
+      } catch (e1) {
+        console.log("[print/usb] direct-port failed, trying spooler:", e1.message);
+        execFileSync("powershell", [...psOpts, psMethod2], { timeout: 30000 });
+      }
     } else {
       execFileSync("lp", ["-d", printerName, "-o", "raw", tmpFile], { timeout: 15000 });
     }
