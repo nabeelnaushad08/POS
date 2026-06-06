@@ -72,77 +72,89 @@ function listSystemPrinters() {
   } catch { return []; }
 }
 
+// ── Pre-compiled print DLL path (persists across print jobs for speed) ─────────
+const RAWPRINT_DLL = path.join(os.homedir(), ".pos_rawprint.dll");
+
+function ensurePrintDll() {
+  if (fs.existsSync(RAWPRINT_DLL)) return; // Already compiled, reuse it
+  console.log("   [usb] Compiling print driver (one-time, ~5 sec)...");
+  const csCode = `
+using System;
+using System.Runtime.InteropServices;
+public class RawPrinter {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+    public class DOCINFOA {
+        [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+        [MarshalAs(UnmanagedType.LPStr)] public string pDatatype;
+    }
+    [DllImport("winspool.drv", EntryPoint="OpenPrinterA", SetLastError=true, CharSet=CharSet.Ansi, ExactSpelling=true)]
+    public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
+    [DllImport("winspool.drv", EntryPoint="StartDocPrinterA", SetLastError=true, CharSet=CharSet.Ansi, ExactSpelling=true)]
+    public static extern int StartDocPrinter(IntPtr hPrinter, int level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA pDocInfo);
+    [DllImport("winspool.drv", SetLastError=true, ExactSpelling=true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true, ExactSpelling=true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true, ExactSpelling=true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true, ExactSpelling=true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
+    [DllImport("winspool.drv", SetLastError=true, ExactSpelling=true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+    public static bool Send(string printerName, byte[] bytes) {
+        IntPtr hPrinter;
+        if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) return false;
+        DOCINFOA di = new DOCINFOA(); di.pDocName = "POS"; di.pDatatype = "RAW";
+        bool ok = false;
+        if (StartDocPrinter(hPrinter, 1, di) > 0) {
+            if (StartPagePrinter(hPrinter)) {
+                IntPtr pBuf = Marshal.AllocCoTaskMem(bytes.Length);
+                Marshal.Copy(bytes, 0, pBuf, bytes.Length);
+                int written;
+                ok = WritePrinter(hPrinter, pBuf, bytes.Length, out written);
+                Marshal.FreeCoTaskMem(pBuf);
+                EndPagePrinter(hPrinter);
+            }
+            EndDocPrinter(hPrinter);
+        }
+        ClosePrinter(hPrinter);
+        return ok;
+    }
+}`;
+  const dllPath = RAWPRINT_DLL.replace(/\\/g, "\\\\");
+  const psCompile = `Add-Type -TypeDefinition @'\n${csCode}\n'@ -OutputAssembly '${dllPath}'`;
+  execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", psCompile],
+    { timeout: 60000 });
+  console.log("   [usb] Print driver compiled OK.");
+}
+
 // ── Raw print to local/USB printer ────────────────────────────────────────────
 function printToLocalPrinter(printerName, data) {
   const tmpFile = path.join(os.tmpdir(), `pos_${Date.now()}.bin`);
   fs.writeFileSync(tmpFile, data);
   try {
     if (process.platform === "win32") {
+      // Ensure the compiled DLL exists (compiles once, reuses forever)
+      try { ensurePrintDll(); } catch (e) {
+        // If DLL compilation failed, delete and retry once
+        try { fs.unlinkSync(RAWPRINT_DLL); } catch {}
+        ensurePrintDll();
+      }
+
       const safeName = printerName.replace(/'/g, "''");
       const safePath = tmpFile.replace(/\\/g, "\\\\");
+      const safeDll  = RAWPRINT_DLL.replace(/\\/g, "\\\\");
 
-      // Method 1: Direct USB port write via WMI (no C# compilation, fastest)
-      const psMethod1 = `
+      const psScript = `
 $ErrorActionPreference = 'Stop'
 $bytes = [System.IO.File]::ReadAllBytes('${safePath}')
-$pName = '${safeName}'
-$printer = Get-WmiObject Win32_Printer -Filter "Name='$pName'" 2>$null
-if (-not $printer) { throw "Printer not found: $pName" }
-$portName = $printer.PortName
-$fs = New-Object System.IO.FileStream("\\\\.\\\$portName", [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
-$fs.Write($bytes, 0, $bytes.Length)
-$fs.Flush()
-$fs.Close()`;
+Add-Type -Path '${safeDll}'
+if (-not [RawPrinter]::Send('${safeName}', $bytes)) { throw "Print failed — check printer is online: ${safeName}" }`;
 
-      // Method 2: Windows Spooler RAW API (reliable fallback, requires C# compilation)
-      const psMethod2 = `
-$ErrorActionPreference = 'Stop'
-$bytes = [System.IO.File]::ReadAllBytes('${safePath}')
-$pName = '${safeName}'
-Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public class RawPrint2 {
-    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Auto)]
-    public struct DOCINFO { public int cbSize; public string pDocName; public string pOutputFile; public string pDataType; public int fwType; }
-    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]
-    public static extern bool OpenPrinter(string n, out IntPtr h, IntPtr d);
-    [DllImport("winspool.drv", SetLastError=true)]
-    public static extern bool ClosePrinter(IntPtr h);
-    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]
-    public static extern int StartDocPrinter(IntPtr h, int lv, ref DOCINFO di);
-    [DllImport("winspool.drv", SetLastError=true)]
-    public static extern bool EndDocPrinter(IntPtr h);
-    [DllImport("winspool.drv", SetLastError=true)]
-    public static extern bool StartPagePrinter(IntPtr h);
-    [DllImport("winspool.drv", SetLastError=true)]
-    public static extern bool EndPagePrinter(IntPtr h);
-    [DllImport("winspool.drv", SetLastError=true)]
-    public static extern bool WritePrinter(IntPtr h, byte[] b, int n, out int w);
-}
-'@
-$di = New-Object RawPrint2+DOCINFO
-$di.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($di)
-$di.pDocName = 'POS'
-$di.pDataType = 'RAW'
-$hp = [IntPtr]::Zero
-if (-not [RawPrint2]::OpenPrinter($pName, [ref]$hp, [IntPtr]::Zero)) { throw "Cannot open: $pName" }
-[RawPrint2]::StartDocPrinter($hp, 1, [ref]$di) | Out-Null
-[RawPrint2]::StartPagePrinter($hp) | Out-Null
-$w = 0; [RawPrint2]::WritePrinter($hp, $bytes, $bytes.Length, [ref]$w) | Out-Null
-[RawPrint2]::EndPagePrinter($hp) | Out-Null
-[RawPrint2]::EndDocPrinter($hp) | Out-Null
-[RawPrint2]::ClosePrinter($hp) | Out-Null`;
-
-      const psOpts = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
-
-      // Try Method 1 first (direct port), fall back to Method 2 (spooler)
-      try {
-        execFileSync("powershell", [...psOpts, psMethod1], { timeout: 10000 });
-      } catch (e1) {
-        console.log("[print/usb] direct-port failed, trying spooler:", e1.message);
-        execFileSync("powershell", [...psOpts, psMethod2], { timeout: 30000 });
-      }
+      execFileSync("powershell",
+        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", psScript],
+        { timeout: 20000 });
     } else {
       execFileSync("lp", ["-d", printerName, "-o", "raw", tmpFile], { timeout: 15000 });
     }
@@ -276,4 +288,12 @@ app.listen(PORT, HOST, () => {
   else if (cfg.printerIp) console.log(`   Network Printer: ${cfg.printerIp}:${cfg.printerPort || 9100}`);
   else console.log(`   No printer configured — open POS Settings to set up.`);
   console.log();
+
+  // Pre-compile USB print driver on Windows so first print is instant
+  if (process.platform === "win32") {
+    setImmediate(() => {
+      try { ensurePrintDll(); }
+      catch (e) { console.log("   [usb] Print driver init failed:", e.message.split("\n")[0]); }
+    });
+  }
 });
