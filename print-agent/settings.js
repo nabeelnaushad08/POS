@@ -18,6 +18,7 @@ const DEFAULTS = {
   receiptNote: "",
   thankYouLine1: "THANK YOU FOR YOUR VISIT",
   thankYouLine2: "COME AGAIN!",
+  agentKey: "",
 };
 
 function load() {

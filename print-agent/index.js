@@ -11,20 +11,33 @@ const { load: loadConfig, save: saveConfig }               = require("./settings
 
 const app  = express();
 const PORT = 3001;
-const HOST = "127.0.0.1";
+const HOST = "0.0.0.0";
 
-// ── CORS: allow any origin (security is TCP-level, 127.0.0.1 only) ───────────
+// ── CORS: allow any origin (security is handled by IP + key check) ───────────
 app.use(cors({
   origin: true,
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
+  allowedHeaders: ["Content-Type", "x-agent-key"],
 }));
 
-// ── Localhost-only guard ──────────────────────────────────────────────────────
+// ── LAN guard: allow localhost freely; LAN requires key if configured ─────────
 app.use((req, res, next) => {
   const raw = req.socket.remoteAddress || "";
-  const ok  = raw === "127.0.0.1" || raw === "::1" || raw === "::ffff:127.0.0.1";
-  if (!ok) return res.status(403).json({ error: "localhost only" });
+  const ip  = raw.replace(/^::ffff:/, "");
+
+  const isLocal = ip === "127.0.0.1" || ip === "::1";
+  const isLAN   = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(ip);
+
+  if (!isLocal && !isLAN) return res.status(403).json({ error: "Access denied" });
+
+  // LAN connections require agent key if one is configured
+  if (!isLocal && isLAN) {
+    const cfg = loadConfig();
+    if (cfg.agentKey) {
+      const provided = req.headers["x-agent-key"];
+      if (provided !== cfg.agentKey) return res.status(403).json({ error: "Invalid agent key" });
+    }
+  }
   next();
 });
 
@@ -283,10 +296,23 @@ app.post("/config", (req, res) => {
 app.listen(PORT, HOST, () => {
   const cfg = loadConfig();
   console.log(`\n🖨  POS Print Agent  v1.0.0`);
-  console.log(`   Listening on http://${HOST}:${PORT}  (localhost only)`);
+  console.log(`   Listening on http://0.0.0.0:${PORT}  (LAN accessible)`);
   if (cfg.printerType === "usb" && cfg.printerName) console.log(`   USB Printer: ${cfg.printerName}`);
   else if (cfg.printerIp) console.log(`   Network Printer: ${cfg.printerIp}:${cfg.printerPort || 9100}`);
   else console.log(`   No printer configured — open POS Settings to set up.`);
+
+  const { networkInterfaces } = require("os");
+  const nets = networkInterfaces();
+  const lanIps = [];
+  for (const iface of Object.values(nets)) {
+    for (const addr of iface) {
+      if (addr.family === "IPv4" && !addr.internal) lanIps.push(addr.address);
+    }
+  }
+  if (lanIps.length) {
+    console.log(`   LAN access: http://${lanIps[0]}:${PORT}`);
+    console.log(`   (Set this URL in POS Settings → Print Agent URL for tablets/phones)`);
+  }
   console.log();
 
   // Pre-compile USB print driver on Windows so first print is instant

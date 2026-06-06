@@ -329,6 +329,7 @@ model SystemSettings {
   receiptNote    String?
   thankYouLine1       String    @default("THANK YOU FOR YOUR VISIT")
   thankYouLine2       String    @default("COME AGAIN!")
+  printAgentUrl       String    @default("http://localhost:3001")
   licenseKey          String?
   licenseActivatedAt  DateTime?
   licenseType         String    @default("TRIAL")

@@ -24,6 +24,7 @@ interface SystemSettingsData {
   licenseKey?: string | null;
   licenseActivatedAt?: string | null;
   licenseType?: string;
+  printAgentUrl: string;
 }
 
 export default function SettingsPage() {
@@ -49,6 +50,7 @@ export default function SettingsPage() {
     licenseKey: null,
     licenseActivatedAt: null,
     licenseType: "TRIAL",
+    printAgentUrl: "http://localhost:3001",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,12 +77,14 @@ export default function SettingsPage() {
   const [selectedPrinterName, setSelectedPrinterName] = useState("");
   const [loadingPrinters, setLoadingPrinters] = useState(false);
 
+  const agentUrl = () => settings.printAgentUrl || "http://localhost:3001";
+
   const detectPrinter = async () => {
     setDetecting(true);
     setDetectedIPs([]);
     setTestResult(null);
     try {
-      const res = await fetch("http://localhost:3001/detect");
+      const res = await fetch(`${agentUrl()}/detect`);
       const data = await res.json();
       setServerSubnet(data.primarySubnet || null);
       if (data.detectedPrinters?.length > 0) {
@@ -98,7 +102,7 @@ export default function SettingsPage() {
     setLoadingPrinters(true);
     setUsbPrinters([]);
     try {
-      const res = await fetch("http://localhost:3001/printers");
+      const res = await fetch(`${agentUrl()}/printers`);
       const data = await res.json();
       setUsbPrinters(data.printers || []);
     } catch {
@@ -113,12 +117,12 @@ export default function SettingsPage() {
     setTestingPrinter(true);
     setTestResult(null);
     try {
-      await fetch("http://localhost:3001/config", {
+      await fetch(`${agentUrl()}/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ printerType: "usb", printerName: selectedPrinterName }),
       });
-      const res = await fetch("http://localhost:3001/test-print", {
+      const res = await fetch(`${agentUrl()}/test-print`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ printerName: selectedPrinterName }),
@@ -136,12 +140,12 @@ export default function SettingsPage() {
     setTestingPrinter(true);
     setTestResult(null);
     try {
-      await fetch("http://localhost:3001/config", {
+      await fetch(`${agentUrl()}/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ printerIp: settings.printerIp, printerType: "network" }),
       }).catch(() => {});
-      const res = await fetch("http://localhost:3001/status");
+      const res = await fetch(`${agentUrl()}/status`);
       const data = await res.json();
       setTestResult(data.status === "online" ? "online" : "offline");
     } catch {
@@ -154,7 +158,7 @@ export default function SettingsPage() {
   const sendTestPrint = async () => {
     setTestingPrinter(true);
     try {
-      const res = await fetch("http://localhost:3001/test-print", {
+      const res = await fetch(`${agentUrl()}/test-print`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ printerIp: settings.printerIp }),
@@ -194,10 +198,11 @@ export default function SettingsPage() {
             licenseKey: d.data.licenseKey || null,
             licenseActivatedAt: d.data.licenseActivatedAt || null,
             licenseType: d.data.licenseType || "TRIAL",
+            printAgentUrl: d.data.printAgentUrl || "http://localhost:3001",
           });
         }
         // Also load print agent config for printerType/printerName
-        fetch("http://localhost:3001/config")
+        fetch(`${d.data?.printAgentUrl || "http://localhost:3001"}/config`)
           .then(r => r.json())
           .then(cfg => {
             if (cfg.printerType) setPrinterType(cfg.printerType);
@@ -241,7 +246,7 @@ export default function SettingsPage() {
         // Notify SettingsProvider to re-fetch globally (currency, theme, etc.)
         window.dispatchEvent(new CustomEvent("settings-updated"));
         // Sync printer IP, display settings, and receipt fields to local print agent
-        fetch("http://localhost:3001/config", {
+        fetch(`${agentUrl()}/config`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -849,6 +854,22 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+
+          {/* Print Agent URL */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Print Agent URL</p>
+            <input
+              type="text"
+              value={settings.printAgentUrl}
+              onChange={e => setSettings(prev => ({ ...prev, printAgentUrl: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-500 font-mono"
+              placeholder="http://localhost:3001"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Use <span className="font-mono">http://localhost:3001</span> for this device, or{" "}
+              <span className="font-mono">http://YOUR-PC-IP:3001</span> for tablets/phones on the same WiFi.
+            </p>
+          </div>
         </div>
       </div>
 

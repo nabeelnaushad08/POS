@@ -18,6 +18,7 @@ const defaults: SystemSettings = {
   kotEnabled: false,
   printerIp: null,
   printerEnabled: false,
+  printAgentUrl: "http://localhost:3001",
 };
 
 const SettingsContext = createContext<SystemSettings>(defaults);

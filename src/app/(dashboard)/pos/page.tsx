@@ -264,7 +264,8 @@ export default function POSPage() {
       };
 
       // Always fire print job — agent being reachable is the source of truth
-      const printJob = fetch("http://localhost:3001/print", {
+      const agentBase = cfg.printAgentUrl || "http://localhost:3001";
+      const printJob = fetch(`${agentBase}/print`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sale: data, type: "receipt", settings: agentSettings }),
@@ -277,7 +278,7 @@ export default function POSPage() {
         // Agent not running — silent, user may not have a printer
       });
       const kotJob = cfg.kotEnabled
-        ? fetch("http://localhost:3001/print", {
+        ? fetch(`${agentBase}/print`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sale: data, type: "kot", settings: agentSettings }),

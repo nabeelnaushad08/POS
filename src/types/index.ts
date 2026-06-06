@@ -187,6 +187,7 @@ export interface SystemSettings {
   kotEnabled?: boolean;
   printerIp?: string | null;
   printerEnabled?: boolean;
+  printAgentUrl?: string;
 }
 
 export interface Sale {
