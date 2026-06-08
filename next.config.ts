@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Standalone mode creates a self-contained output that can be deployed anywhere.
-  // Vercel ignores this setting automatically; VPS deployments benefit from it.
-  output: "standalone",
+  // Use standalone output only on VPS/self-hosted builds, NOT on Vercel.
+  // The packaging script (scripts/package-for-client.sh) sets NEXT_BUILD_STANDALONE=1.
+  ...(process.env.NEXT_BUILD_STANDALONE === "1" ? { output: "standalone" } : {}),
 
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],

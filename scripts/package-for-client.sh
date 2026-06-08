@@ -19,8 +19,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # 1. Build the Next.js app (standalone output)
-echo "[1/4] Building Next.js app..."
-npm run build
+echo "[1/4] Building Next.js app (standalone)..."
+NEXT_BUILD_STANDALONE=1 npm run build
 
 # 2. Create package directory
 echo "[2/4] Assembling package..."

@@ -15,7 +15,8 @@ echo   Zenthoz POS - Packaging for: %CLIENT%
 echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 echo.
 
-echo [1/4] Building Next.js app...
+echo [1/4] Building Next.js app (standalone)...
+SET NEXT_BUILD_STANDALONE=1
 call npm run build
 IF ERRORLEVEL 1 (echo BUILD FAILED & exit /b 1)
 
