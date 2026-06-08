@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Standalone mode creates a self-contained output that can be deployed anywhere
-  // Remove this if deploying on Vercel (Vercel handles it automatically)
-  // output: "standalone",  // Uncomment for VPS/self-hosted deployments
+  // Standalone mode creates a self-contained output that can be deployed anywhere.
+  // Vercel ignores this setting automatically; VPS deployments benefit from it.
+  output: "standalone",
 
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
